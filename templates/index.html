@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>앱과사전 — 실시간 앱 순위</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background: #0f0f13; }
+    .glass {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      backdrop-filter: blur(12px);
+    }
+    .tab-active {
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      color: #fff;
+      box-shadow: 0 0 20px rgba(99,102,241,0.4);
+    }
+    .tab-inactive {
+      color: #9ca3af;
+    }
+    .tab-inactive:hover { color: #e5e7eb; background: rgba(255,255,255,0.06); }
+    .rank-badge {
+      width: 28px; height: 28px;
+      display: flex; align-items: center; justify-content: center;
+      border-radius: 6px; font-size: 12px; font-weight: 700;
+    }
+    .rank-1 { background: linear-gradient(135deg,#f59e0b,#fbbf24); color:#000; }
+    .rank-2 { background: linear-gradient(135deg,#9ca3af,#d1d5db); color:#000; }
+    .rank-3 { background: linear-gradient(135deg,#b45309,#d97706); color:#fff; }
+    .rank-n  { background: rgba(255,255,255,0.07); color:#9ca3af; }
+    .store-badge-appstore  { background:#1d6ff3; }
+    .store-badge-googleplay{ background:#01875f; }
+    .vote-btn {
+      transition: all .15s;
+    }
+    .vote-btn:hover { transform: scale(1.1); }
+    .vote-btn.voted { color: #818cf8; }
+    .pulse-dot {
+      width:8px; height:8px; border-radius:50%;
+      background:#4ade80; box-shadow:0 0 6px #4ade80;
+      animation: pulse 1.8s infinite;
+    }
+    @keyframes pulse {
+      0%,100%{ opacity:1; transform:scale(1); }
+      50%{ opacity:.5; transform:scale(1.4); }
+    }
+    .shimmer {
+      background: linear-gradient(90deg,rgba(255,255,255,0.04) 25%,rgba(255,255,255,0.09) 50%,rgba(255,255,255,0.04) 75%);
+      background-size:200% 100%;
+      animation: shimmer 1.5s infinite;
+    }
+    @keyframes shimmer{ 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+    ::-webkit-scrollbar{ width:4px; }
+    ::-webkit-scrollbar-track{ background:transparent; }
+    ::-webkit-scrollbar-thumb{ background:#374151; border-radius:2px; }
+  </style>
+</head>
+<body class="min-h-screen text-white font-sans">
+
+  <!-- Header -->
+  <header class="border-b border-white/5 sticky top-0 z-50" style="background:rgba(15,15,19,0.85);backdrop-filter:blur(16px)">
+    <div class="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 rounded-lg flex items-center justify-center text-lg" style="background:linear-gradient(135deg,#6366f1,#8b5cf6)">📱</div>
+        <span class="text-lg font-bold tracking-tight">앱과사전</span>
+        <span class="text-xs text-gray-500 hidden sm:block">실시간 앱 순위</span>
+      </div>
+      <div class="flex items-center gap-2 text-xs text-gray-500">
+        <div class="pulse-dot"></div>
+        <span>실시간 업데이트</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-5xl mx-auto px-4 py-8">
+
+    <!-- Hero -->
+    <div class="text-center mb-10">
+      <h1 class="text-3xl sm:text-4xl font-extrabold mb-3 bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
+        앱과사전
+      </h1>
+      <p class="text-gray-400 text-sm">App Store · Google Play 실시간 차트 + 사용자 투표 + 에디터 픽</p>
+    </div>
+
+    <!-- Tabs -->
+    <div class="glass rounded-2xl p-1.5 flex gap-1 mb-8 text-sm font-medium">
+      <button onclick="switchTab('downloads')" id="tab-downloads"
+        class="tab-active flex-1 py-2.5 px-3 rounded-xl flex items-center justify-center gap-2 transition-all">
+        <span>📥</span><span class="hidden sm:inline">다운로드 순위</span><span class="sm:hidden">다운로드</span>
+      </button>
+      <button onclick="switchTab('popularity')" id="tab-popularity"
+        class="tab-inactive flex-1 py-2.5 px-3 rounded-xl flex items-center justify-center gap-2 transition-all">
+        <span>🔥</span><span class="hidden sm:inline">인기도 순위</span><span class="sm:hidden">인기도</span>
+      </button>
+      <button onclick="switchTab('votes')" id="tab-votes"
+        class="tab-inactive flex-1 py-2.5 px-3 rounded-xl flex items-center justify-center gap-2 transition-all">
+        <span>👍</span><span class="hidden sm:inline">투표 순위</span><span class="sm:hidden">투표</span>
+      </button>
+      <button onclick="switchTab('curated')" id="tab-curated"
+        class="tab-inactive flex-1 py-2.5 px-3 rounded-xl flex items-center justify-center gap-2 transition-all">
+        <span>⭐</span><span class="hidden sm:inline">에디터 픽</span><span class="sm:hidden">에디터</span>
+      </button>
+    </div>
+
+    <!-- Filter bar -->
+    <div class="flex items-center justify-between mb-4">
+      <div id="tab-label" class="text-sm text-gray-400"></div>
+      <div class="flex items-center gap-2">
+        <select id="store-filter" onchange="applyFilter()"
+          class="text-xs px-3 py-1.5 rounded-lg border border-white/10 bg-white/5 text-gray-300 focus:outline-none cursor-pointer">
+          <option value="all">전체 스토어</option>
+          <option value="appstore">App Store</option>
+          <option value="googleplay">Google Play</option>
+        </select>
+        <select id="category-filter" onchange="applyFilter()"
+          class="text-xs px-3 py-1.5 rounded-lg border border-white/10 bg-white/5 text-gray-300 focus:outline-none cursor-pointer">
+          <option value="all">전체 카테고리</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- List -->
+    <div id="app-list" class="space-y-2"></div>
+
+    <!-- Footer hint -->
+    <p class="text-center text-xs text-gray-600 mt-10">
+      데이터는 App Store 공식 RSS를 사용합니다 · 매 시간 자동 갱신
+    </p>
+  </main>
+
+  <script>
+    let currentTab = 'downloads';
+    let allApps = [];
+    let votedSet = new Set(JSON.parse(localStorage.getItem('voted') || '[]'));
+
+    const tabLabels = {
+      downloads:  '📥 App Store 다운로드 Top 50',
+      popularity: '🔥 인기도 기반 Top 50',
+      votes:      '👍 사용자 투표 Top 50',
+      curated:    '⭐ 에디터 픽',
+    };
+
+    function switchTab(tab) {
+      currentTab = tab;
+      ['downloads','popularity','votes','curated'].forEach(t => {
+        const el = document.getElementById('tab-' + t);
+        el.className = el.className.replace(/tab-active|tab-inactive/g, '').trim();
+        el.classList.add(t === tab ? 'tab-active' : 'tab-inactive');
+      });
+      document.getElementById('store-filter').style.display = tab === 'curated' ? 'none' : '';
+      document.getElementById('category-filter').style.display = tab === 'curated' ? 'none' : '';
+      loadApps();
+    }
+
+    async function loadApps() {
+      document.getElementById('tab-label').textContent = tabLabels[currentTab];
+      showSkeleton();
+      try {
+        const res = await fetch(`/api/rankings?tab=${currentTab}`);
+        allApps = await res.json();
+        populateCategories();
+        applyFilter();
+      } catch(e) {
+        document.getElementById('app-list').innerHTML =
+          `<div class="text-center text-gray-500 py-16">데이터를 불러오지 못했어요 😢</div>`;
+      }
+    }
+
+    function populateCategories() {
+      const sel = document.getElementById('category-filter');
+      const current = sel.value;
+      const cats = [...new Set(allApps.map(a => a.category).filter(Boolean))].sort();
+      sel.innerHTML = `<option value="all">전체 카테고리</option>` +
+        cats.map(c => `<option value="${c}">${c}</option>`).join('');
+      if (cats.includes(current)) sel.value = current;
+    }
+
+    function applyFilter() {
+      const store = document.getElementById('store-filter').value;
+      const cat   = document.getElementById('category-filter').value;
+      let apps = allApps;
+      if (store !== 'all') apps = apps.filter(a => a.store === store);
+      if (cat   !== 'all') apps = apps.filter(a => a.category === cat);
+      renderList(apps);
+    }
+
+    function renderList(apps) {
+      const el = document.getElementById('app-list');
+      if (!apps.length) {
+        el.innerHTML = `<div class="text-center text-gray-500 py-16">앱이 없어요 🫙</div>`;
+        return;
+      }
+      el.innerHTML = apps.map((app, i) => appCard(app, i + 1)).join('');
+    }
+
+    function appCard(app, i) {
+      const rankClass = i === 1 ? 'rank-1' : i === 2 ? 'rank-2' : i === 3 ? 'rank-3' : 'rank-n';
+      const storeBadge = app.store === 'appstore'
+        ? `<span class="store-badge-appstore text-white text-[10px] px-1.5 py-0.5 rounded-md font-semibold">App Store</span>`
+        : `<span class="store-badge-googleplay text-white text-[10px] px-1.5 py-0.5 rounded-md font-semibold">Google Play</span>`;
+      const voted = votedSet.has(app.app_id);
+      const voteColor = voted ? 'text-indigo-400' : 'text-gray-500 hover:text-indigo-400';
+
+      return `
+        <div class="glass rounded-2xl px-4 py-3 flex items-center gap-4 group transition-all hover:border-white/15">
+          <div class="rank-badge ${rankClass} shrink-0">${i}</div>
+          <img src="${app.icon}" alt="${escHtml(app.name)}"
+            class="w-12 h-12 rounded-2xl shrink-0 object-cover bg-white/5"
+            onerror="this.src='https://placehold.co/48x48/1f2937/6b7280?text=App'"/>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="font-semibold text-sm truncate">${escHtml(app.name)}</span>
+              ${storeBadge}
+            </div>
+            <div class="text-xs text-gray-500 truncate mt-0.5">${escHtml(app.developer || '')} · ${escHtml(app.category || '')}</div>
+          </div>
+          <div class="flex items-center gap-3 shrink-0">
+            <div class="text-center hidden sm:block">
+              <div class="text-xs font-bold text-indigo-300">${app.votes || 0}</div>
+              <div class="text-[10px] text-gray-600">votes</div>
+            </div>
+            <button onclick="vote('${escHtml(app.app_id)}', this)"
+              class="vote-btn ${voteColor} flex flex-col items-center gap-0.5 text-[10px] ${voted ? 'voted' : ''}">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="${voted ? 'currentColor' : 'none'}" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21H5a2 2 0 01-2-2v-7a2 2 0 012-2h2.924L11 3.382A1 1 0 0112 3h.023a1 1 0 01.977 1.006V10z"/>
+              </svg>
+              <span>${voted ? '추천됨' : '추천'}</span>
+            </button>
+            <a href="${app.url}" target="_blank"
+              class="text-xs text-gray-500 hover:text-white transition-colors px-2 py-1 rounded-lg hover:bg-white/5">
+              →
+            </a>
+          </div>
+        </div>`;
+    }
+
+    async function vote(appId, btn) {
+      if (votedSet.has(appId)) return;
+      try {
+        const res = await fetch('/api/vote', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({app_id: appId})
+        });
+        const data = await res.json();
+        votedSet.add(appId);
+        localStorage.setItem('voted', JSON.stringify([...votedSet]));
+        // update card vote count inline
+        const card = btn.closest('.glass');
+        const countEl = card.querySelector('.text-indigo-300');
+        if (countEl) countEl.textContent = data.vote_count;
+        btn.classList.add('voted');
+        btn.querySelector('span').textContent = '추천됨';
+        btn.querySelector('svg').setAttribute('fill','currentColor');
+      } catch(e) { console.error(e); }
+    }
+
+    function showSkeleton() {
+      document.getElementById('app-list').innerHTML =
+        Array.from({length:8}).map(() => `
+          <div class="glass rounded-2xl px-4 py-3 flex items-center gap-4">
+            <div class="shimmer w-7 h-7 rounded-lg shrink-0"></div>
+            <div class="shimmer w-12 h-12 rounded-2xl shrink-0"></div>
+            <div class="flex-1 space-y-2">
+              <div class="shimmer h-3 w-40 rounded"></div>
+              <div class="shimmer h-2.5 w-24 rounded"></div>
+            </div>
+          </div>`).join('');
+    }
+
+    function escHtml(s) {
+      return String(s || '').replace(/[&<>"']/g, c =>
+        ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+
+    // 초기 로드
+    loadApps();
+    // 60초마다 자동 갱신
+    setInterval(loadApps, 60000);
+  </script>
+</body>
+</html>
