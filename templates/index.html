@@ -93,22 +93,30 @@
     </div>
 
     <!-- Tabs -->
-    <div class="glass rounded-2xl p-1.5 flex gap-1 mb-8 text-sm font-medium">
+    <div class="glass rounded-2xl p-1.5 grid grid-cols-3 sm:grid-cols-6 gap-1 mb-8 text-sm font-medium">
       <button onclick="switchTab('downloads')" id="tab-downloads"
-        class="tab-active flex-1 py-2.5 px-3 rounded-xl flex items-center justify-center gap-2 transition-all">
-        <span>📥</span><span class="hidden sm:inline">다운로드 순위</span><span class="sm:hidden">다운로드</span>
+        class="tab-active py-2.5 px-2 rounded-xl flex items-center justify-center gap-1.5 transition-all">
+        <span>📥</span><span class="hidden sm:inline">다운로드</span><span class="sm:hidden text-xs">다운로드</span>
       </button>
-      <button onclick="switchTab('popularity')" id="tab-popularity"
-        class="tab-inactive flex-1 py-2.5 px-3 rounded-xl flex items-center justify-center gap-2 transition-all">
-        <span>🔥</span><span class="hidden sm:inline">인기도 순위</span><span class="sm:hidden">인기도</span>
+      <button onclick="switchTab('revenue')" id="tab-revenue"
+        class="tab-inactive py-2.5 px-2 rounded-xl flex items-center justify-center gap-1.5 transition-all">
+        <span>💰</span><span class="hidden sm:inline">매출 순위</span><span class="sm:hidden text-xs">매출</span>
+      </button>
+      <button onclick="switchTab('new')" id="tab-new"
+        class="tab-inactive py-2.5 px-2 rounded-xl flex items-center justify-center gap-1.5 transition-all">
+        <span>🆕</span><span class="hidden sm:inline">신규 앱</span><span class="sm:hidden text-xs">신규</span>
+      </button>
+      <button onclick="switchTab('googleplay')" id="tab-googleplay"
+        class="tab-inactive py-2.5 px-2 rounded-xl flex items-center justify-center gap-1.5 transition-all">
+        <span>🤖</span><span class="hidden sm:inline">Google Play</span><span class="sm:hidden text-xs">플레이</span>
       </button>
       <button onclick="switchTab('votes')" id="tab-votes"
-        class="tab-inactive flex-1 py-2.5 px-3 rounded-xl flex items-center justify-center gap-2 transition-all">
-        <span>👍</span><span class="hidden sm:inline">투표 순위</span><span class="sm:hidden">투표</span>
+        class="tab-inactive py-2.5 px-2 rounded-xl flex items-center justify-center gap-1.5 transition-all">
+        <span>👍</span><span class="hidden sm:inline">투표 순위</span><span class="sm:hidden text-xs">투표</span>
       </button>
       <button onclick="switchTab('curated')" id="tab-curated"
-        class="tab-inactive flex-1 py-2.5 px-3 rounded-xl flex items-center justify-center gap-2 transition-all">
-        <span>⭐</span><span class="hidden sm:inline">에디터 픽</span><span class="sm:hidden">에디터</span>
+        class="tab-inactive py-2.5 px-2 rounded-xl flex items-center justify-center gap-1.5 transition-all">
+        <span>⭐</span><span class="hidden sm:inline">에디터 픽</span><span class="sm:hidden text-xs">에디터</span>
       </button>
     </div>
 
@@ -144,21 +152,24 @@
     let votedSet = new Set(JSON.parse(localStorage.getItem('voted') || '[]'));
 
     const tabLabels = {
-      downloads:  '📥 App Store 다운로드 Top 50',
-      popularity: '🔥 인기도 기반 Top 50',
-      votes:      '👍 사용자 투표 Top 50',
-      curated:    '⭐ 에디터 픽',
+      downloads:   '📥 App Store 다운로드 Top 50',
+      revenue:     '💰 App Store 매출 Top 50',
+      new:         '🆕 App Store 신규 앱 Top 50',
+      googleplay:  '🤖 Google Play 인기 앱',
+      votes:       '👍 사용자 투표 Top 50',
+      curated:     '⭐ 에디터 픽',
     };
 
     function switchTab(tab) {
       currentTab = tab;
-      ['downloads','popularity','votes','curated'].forEach(t => {
+      ['downloads','revenue','new','googleplay','votes','curated'].forEach(t => {
         const el = document.getElementById('tab-' + t);
         el.className = el.className.replace(/tab-active|tab-inactive/g, '').trim();
         el.classList.add(t === tab ? 'tab-active' : 'tab-inactive');
       });
-      document.getElementById('store-filter').style.display = tab === 'curated' ? 'none' : '';
-      document.getElementById('category-filter').style.display = tab === 'curated' ? 'none' : '';
+      const hideFilter = tab === 'curated' || tab === 'googleplay';
+      document.getElementById('store-filter').style.display = hideFilter ? 'none' : '';
+      document.getElementById('category-filter').style.display = hideFilter ? 'none' : '';
       loadApps();
     }
 

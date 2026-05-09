@@ -1,7 +1,6 @@
 from flask import Flask, render_template, jsonify, request
 from flask_cors import CORS
 import requests
-import json
 import sqlite3
 import os
 from datetime import datetime
@@ -11,7 +10,6 @@ CORS(app)
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "appranking.db")
 
-# ── DB 초기화 ──────────────────────────────────────────
 def init_db():
     con = sqlite3.connect(DB_PATH)
     cur = con.cursor()
@@ -38,9 +36,8 @@ def init_db():
 
 init_db()
 
-# ── App Store RSS (상위 100개) ─────────────────────────
-def fetch_appstore(limit=50):
-    url = f"https://itunes.apple.com/kr/rss/topfreeapplications/limit={limit}/json"
+def fetch_apple_rss(feed, limit=50, store="appstore", id_prefix=""):
+    url = f"https://itunes.apple.com/kr/rss/{feed}/limit={limit}/json"
     try:
         r = requests.get(url, timeout=8)
         data = r.json()
@@ -48,49 +45,52 @@ def fetch_appstore(limit=50):
         apps = []
         for i, e in enumerate(entries):
             apps.append({
-                "app_id":    e["id"]["attributes"]["im:id"],
+                "app_id":    id_prefix + e["id"]["attributes"]["im:id"],
                 "name":      e["im:name"]["label"],
                 "icon":      e["im:image"][-1]["label"],
                 "developer": e.get("im:artist", {}).get("label", ""),
                 "category":  e.get("category", {}).get("attributes", {}).get("label", ""),
-                "store":     "appstore",
+                "store":     store,
                 "url":       e["id"]["label"],
                 "rank":      i + 1,
-                "genre":     e.get("category", {}).get("attributes", {}).get("label", ""),
             })
         return apps
     except Exception as ex:
-        print(f"AppStore fetch error: {ex}")
+        print(f"Apple RSS fetch error ({feed}): {ex}")
         return []
 
-# ── Google Play (공개 RSS / 대체 방식) ────────────────
-def fetch_googleplay(limit=50):
+def fetch_googleplay_popular(limit=50):
+    keywords = ["카카오", "네이버", "쿠팡", "배달의민족", "유튜브", "인스타그램",
+                "틱톡", "당근마켓", "토스", "카카오페이", "무신사", "올리브영",
+                "넷플릭스", "스포티파이", "라인", "밴드", "네이버지도", "카카오맵"]
     try:
-        r = requests.get(
-            f"https://itunes.apple.com/kr/rss/topgrossingapplications/limit={limit}/json",
-            timeout=8
-        )
-        data = r.json()
-        entries = data["feed"]["entry"]
+        from google_play_scraper import search
+        seen = set()
         apps = []
-        for i, e in enumerate(entries):
-            apps.append({
-                "app_id":    "gp_" + e["id"]["attributes"]["im:id"],
-                "name":      e["im:name"]["label"],
-                "icon":      e["im:image"][-1]["label"],
-                "developer": e.get("im:artist", {}).get("label", ""),
-                "category":  e.get("category", {}).get("attributes", {}).get("label", ""),
-                "store":     "googleplay",
-                "url":       e["id"]["label"],
-                "rank":      i + 1,
-                "genre":     e.get("category", {}).get("attributes", {}).get("label", ""),
-            })
-        return apps
+        for kw in keywords:
+            if len(apps) >= limit:
+                break
+            results = search(kw, lang="ko", country="kr", n_hits=5)
+            for r in results:
+                if not r.get("appId") or not r.get("title"):
+                    continue
+                if r["appId"] not in seen:
+                    seen.add(r["appId"])
+                    apps.append({
+                        "app_id":    "gp_" + r["appId"],
+                        "name":      r["title"],
+                        "icon":      r.get("icon") or "",
+                        "developer": r.get("developer") or "",
+                        "category":  r.get("genre") or "",
+                        "store":     "googleplay",
+                        "url":       f"https://play.google.com/store/apps/details?id={r['appId']}",
+                        "rank":      len(apps) + 1,
+                    })
+        return apps[:limit]
     except Exception as ex:
-        print(f"GooglePlay fetch error: {ex}")
+        print(f"Google Play fetch error: {ex}")
         return []
 
-# ── 투표 수 조회 ──────────────────────────────────────
 def get_votes(app_ids):
     if not app_ids:
         return {}
@@ -102,7 +102,6 @@ def get_votes(app_ids):
     con.close()
     return result
 
-# ── 큐레이션 목록 ─────────────────────────────────────
 def get_curated():
     con = sqlite3.connect(DB_PATH)
     cur = con.cursor()
@@ -112,47 +111,42 @@ def get_curated():
     return [{"app_id": r[0], "name": r[1], "icon": r[2], "developer": r[3],
              "category": r[4], "store": r[5], "url": r[6], "added_at": r[7]} for r in rows]
 
-# ── 라우트 ────────────────────────────────────────────
+def attach_votes(apps):
+    ids = [a["app_id"] for a in apps]
+    votes = get_votes(ids)
+    for a in apps:
+        a["votes"] = votes.get(a["app_id"], 0)
+    return apps
+
 @app.route("/")
 def index():
     return render_template("index.html")
 
 @app.route("/api/rankings")
 def rankings():
-    tab = request.args.get("tab", "downloads")  # downloads | popularity | votes | curated
+    tab = request.args.get("tab", "downloads")
 
     if tab == "downloads":
-        apps = fetch_appstore(50)
-        ids = [a["app_id"] for a in apps]
-        votes = get_votes(ids)
-        for a in apps:
-            a["votes"] = votes.get(a["app_id"], 0)
-        return jsonify(apps)
-
-    elif tab == "popularity":
-        apps = fetch_googleplay(50)
-        ids = [a["app_id"] for a in apps]
-        votes = get_votes(ids)
-        for a in apps:
-            a["votes"] = votes.get(a["app_id"], 0)
-        return jsonify(apps)
-
+        apps = fetch_apple_rss("topfreeapplications", 50)
+    elif tab == "revenue":
+        apps = fetch_apple_rss("topgrossingapplications", 50)
+    elif tab == "new":
+        apps = fetch_apple_rss("newfreeapplications", 50)
+    elif tab == "googleplay":
+        apps = fetch_googleplay_popular(50)
     elif tab == "votes":
-        appstore = fetch_appstore(50)
-        googleplay = fetch_googleplay(50)
-        all_apps = appstore + googleplay
-        ids = [a["app_id"] for a in all_apps]
-        votes = get_votes(ids)
-        for a in all_apps:
-            a["votes"] = votes.get(a["app_id"], 0)
-        all_apps.sort(key=lambda x: x["votes"], reverse=True)
-        # 투표 0인 앱은 원래 순위 유지
-        return jsonify(all_apps[:50])
-
+        appstore = fetch_apple_rss("topfreeapplications", 50)
+        gplay = fetch_googleplay_popular(30)
+        apps = appstore + gplay
+        attach_votes(apps)
+        apps.sort(key=lambda x: x["votes"], reverse=True)
+        return jsonify(apps[:50])
     elif tab == "curated":
         return jsonify(get_curated())
+    else:
+        return jsonify([])
 
-    return jsonify([])
+    return jsonify(attach_votes(apps))
 
 @app.route("/api/vote", methods=["POST"])
 def vote():
