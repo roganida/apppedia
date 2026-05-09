@@ -270,5 +270,24 @@ def curate():
     con.close()
     return jsonify({"ok": True})
 
+@app.route("/sitemap.xml")
+def sitemap():
+    xml = '''<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://apppedia.onrender.com/</loc>
+    <changefreq>hourly</changefreq>
+    <priority>1.0</priority>
+  </url>
+</urlset>'''
+    return app.response_class(xml, mimetype="application/xml")
+
+@app.route("/robots.txt")
+def robots():
+    txt = """User-agent: *
+Allow: /
+Sitemap: https://apppedia.onrender.com/sitemap.xml"""
+    return app.response_class(txt, mimetype="text/plain")
+
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
