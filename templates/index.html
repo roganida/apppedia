@@ -352,16 +352,18 @@
       return `
         <div class="app-card px-4 py-3 flex items-center gap-4">
           <div class="rank-badge ${rankClass} shrink-0">${i}</div>
+          <a href="/app/${escHtml(app.app_id)}" class="flex items-center gap-4 flex-1 min-w-0">
           <img src="${app.icon}" alt="${escHtml(app.name)}"
             class="w-12 h-12 rounded-2xl shrink-0 object-cover bg-gray-100"
             onerror="this.src='https://placehold.co/48x48/e2e8f0/94a3b8?text=App'"/>
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-2 flex-wrap">
-              <span class="font-semibold text-sm text-gray-900 truncate">${escHtml(app.name)}</span>
+              <span class="font-semibold text-sm text-gray-900 truncate hover:text-blue-600 transition-colors">${escHtml(app.name)}</span>
               ${storeBadge}
             </div>
             <div class="text-xs text-gray-400 truncate mt-0.5">${escHtml(app.developer || '')} · ${escHtml(app.category || '')}</div>
           </div>
+          </a>
           <div class="flex items-center gap-3 shrink-0">
             <div class="text-center hidden sm:block">
               <div class="text-xs font-bold vote-count">${app.votes || 0}</div>

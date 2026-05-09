@@ -270,6 +270,60 @@ def curate():
     con.close()
     return jsonify({"ok": True})
 
+@app.route("/app/<app_id>")
+def app_detail(app_id):
+    return render_template("app_detail.html", app_id=app_id)
+
+@app.route("/api/app/<app_id>")
+def api_app_detail(app_id):
+    if app_id.startswith("gp_"):
+        gp_id = app_id[3:]
+        try:
+            from google_play_scraper import app as gp_app
+            d = gp_app(gp_id, lang="ko", country="kr")
+            return jsonify({
+                "app_id":      app_id,
+                "name":        d.get("title", ""),
+                "icon":        d.get("icon", ""),
+                "developer":   d.get("developer", ""),
+                "category":    d.get("genre", ""),
+                "rating":      round(d.get("score") or 0, 1),
+                "rating_count":d.get("ratings", 0),
+                "description": d.get("description", ""),
+                "screenshots": d.get("screenshots", [])[:5],
+                "version":     d.get("version", ""),
+                "updated":     d.get("updated", ""),
+                "store":       "googleplay",
+                "url":         f"https://play.google.com/store/apps/details?id={gp_id}",
+            })
+        except Exception as ex:
+            return jsonify({"error": str(ex)}), 404
+    else:
+        try:
+            r = requests.get(f"https://itunes.apple.com/kr/lookup?id={app_id}", timeout=8)
+            results = r.json().get("results", [])
+            if not results:
+                return jsonify({"error": "not found"}), 404
+            d = results[0]
+            return jsonify({
+                "app_id":      app_id,
+                "name":        d.get("trackName", ""),
+                "icon":        d.get("artworkUrl512") or d.get("artworkUrl100", ""),
+                "developer":   d.get("artistName", ""),
+                "category":    d.get("primaryGenreName", ""),
+                "rating":      round(d.get("averageUserRating") or 0, 1),
+                "rating_count":d.get("userRatingCount", 0),
+                "description": d.get("description", ""),
+                "screenshots": d.get("screenshotUrls", [])[:5],
+                "version":     d.get("version", ""),
+                "updated":     d.get("currentVersionReleaseDate", "")[:10],
+                "store":       "appstore",
+                "url":         d.get("trackViewUrl", ""),
+                "price":       d.get("formattedPrice", "무료"),
+            })
+        except Exception as ex:
+            return jsonify({"error": str(ex)}), 404
+
 @app.route("/sitemap.xml")
 def sitemap():
     xml = '''<?xml version="1.0" encoding="UTF-8"?>
