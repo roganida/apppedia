@@ -10,6 +10,35 @@ CORS(app)
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "appranking.db")
 
+COLLECTIONS = [
+    {"id": "weekly",      "emoji": "🔥", "title": "이번 주 추천",    "desc": "에디터가 직접 골랐어요"},
+    {"id": "productivity","emoji": "💼", "title": "생산성 앱 모음",   "desc": "일 잘하는 사람들의 앱"},
+    {"id": "game",        "emoji": "🎮", "title": "인기 게임",        "desc": "요즘 가장 핫한 게임"},
+    {"id": "photo",       "emoji": "📸", "title": "사진 & 영상",      "desc": "더 예쁘게, 더 재미있게"},
+]
+
+SAMPLE_CURATED = [
+    # 이번 주 추천
+    {"app_id":"362057947",  "collection":"weekly","store":"appstore"},  # 카카오톡
+    {"app_id":"544007664",  "collection":"weekly","store":"appstore"},  # YouTube
+    {"app_id":"839333328",  "collection":"weekly","store":"appstore"},  # 토스
+    {"app_id":"378084485",  "collection":"weekly","store":"appstore"},  # 배달의민족
+    {"app_id":"393499958",  "collection":"weekly","store":"appstore"},  # 네이버
+    # 생산성
+    {"app_id":"1097040613", "collection":"productivity","store":"appstore"},  # Microsoft To Do
+    {"app_id":"422689480",  "collection":"productivity","store":"appstore"},  # Fantastical
+    {"app_id":"1274495053", "collection":"productivity","store":"appstore"},  # Notion
+    {"app_id":"1018769995", "collection":"productivity","store":"appstore"},  # 당근
+    # 게임
+    {"app_id":"1229016807", "collection":"game","store":"appstore"},  # 브롤스타즈
+    {"app_id":"529479190",  "collection":"game","store":"appstore"},  # 클래시 오브 클랜
+    {"app_id":"363590051",  "collection":"game","store":"appstore"},  # Netflix
+    # 사진 & 영상
+    {"app_id":"1022267439", "collection":"photo","store":"appstore"},  # SNOW
+    {"app_id":"1500855883", "collection":"photo","store":"appstore"},  # CapCut
+    {"app_id":"389801252",  "collection":"photo","store":"appstore"},  # Instagram
+]
+
 def init_db():
     con = sqlite3.connect(DB_PATH)
     cur = con.cursor()
@@ -21,18 +50,55 @@ def init_db():
     """)
     cur.execute("""
         CREATE TABLE IF NOT EXISTS curated (
-            app_id    TEXT PRIMARY KEY,
-            name      TEXT,
-            icon      TEXT,
-            developer TEXT,
-            category  TEXT,
-            store     TEXT,
-            url       TEXT,
-            added_at  TEXT
+            app_id     TEXT,
+            collection TEXT,
+            name       TEXT,
+            icon       TEXT,
+            developer  TEXT,
+            category   TEXT,
+            store      TEXT,
+            url        TEXT,
+            added_at   TEXT,
+            PRIMARY KEY (app_id, collection)
         )
     """)
     con.commit()
+    # 샘플 데이터 없으면 채우기
+    cur.execute("SELECT COUNT(*) FROM curated")
+    if cur.fetchone()[0] == 0:
+        seed_curated(con)
     con.close()
+
+def seed_curated(con):
+    cur = con.cursor()
+    for item in SAMPLE_CURATED:
+        info = fetch_itunes_info(item["app_id"])
+        if not info:
+            continue
+        cur.execute("""
+            INSERT OR IGNORE INTO curated (app_id, collection, name, icon, developer, category, store, url, added_at)
+            VALUES (?,?,?,?,?,?,?,?,?)
+        """, (item["app_id"], item["collection"], info["name"], info["icon"],
+              info["developer"], info["category"], item["store"], info["url"],
+              datetime.now().isoformat()))
+    con.commit()
+
+def fetch_itunes_info(app_id):
+    try:
+        r = requests.get(f"https://itunes.apple.com/kr/lookup?id={app_id}", timeout=8)
+        results = r.json().get("results", [])
+        if not results:
+            return None
+        d = results[0]
+        return {
+            "name":      d.get("trackName", ""),
+            "icon":      d.get("artworkUrl100", ""),
+            "developer": d.get("artistName", ""),
+            "category":  d.get("primaryGenreName", ""),
+            "url":       d.get("trackViewUrl", ""),
+        }
+    except:
+        return None
 
 init_db()
 
@@ -105,11 +171,31 @@ def get_votes(app_ids):
 def get_curated():
     con = sqlite3.connect(DB_PATH)
     cur = con.cursor()
-    cur.execute("SELECT app_id, name, icon, developer, category, store, url, added_at FROM curated ORDER BY added_at DESC")
+    cur.execute("""
+        SELECT app_id, collection, name, icon, developer, category, store, url
+        FROM curated ORDER BY added_at DESC
+    """)
     rows = cur.fetchall()
     con.close()
-    return [{"app_id": r[0], "name": r[1], "icon": r[2], "developer": r[3],
-             "category": r[4], "store": r[5], "url": r[6], "added_at": r[7]} for r in rows]
+    apps_by_col = {}
+    for r in rows:
+        col = r[1]
+        if col not in apps_by_col:
+            apps_by_col[col] = []
+        apps_by_col[col].append({
+            "app_id": r[0], "collection": r[1], "name": r[2], "icon": r[3],
+            "developer": r[4], "category": r[5], "store": r[6], "url": r[7],
+        })
+    result = []
+    for c in COLLECTIONS:
+        result.append({
+            "id":    c["id"],
+            "emoji": c["emoji"],
+            "title": c["title"],
+            "desc":  c["desc"],
+            "apps":  apps_by_col.get(c["id"], []),
+        })
+    return result
 
 def attach_votes(apps):
     ids = [a["app_id"] for a in apps]
