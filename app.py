@@ -62,6 +62,21 @@ def init_db():
             PRIMARY KEY (app_id, collection)
         )
     """)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS rank_history (
+            id       INTEGER PRIMARY KEY AUTOINCREMENT,
+            tab      TEXT,
+            date     TEXT,
+            rank     INTEGER,
+            app_id   TEXT,
+            name     TEXT,
+            icon     TEXT,
+            store    TEXT,
+            developer TEXT,
+            category  TEXT
+        )
+    """)
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_history_tab_date ON rank_history(tab, date)")
     con.commit()
     # 샘플 데이터 없으면 채우기
     cur.execute("SELECT COUNT(*) FROM curated")
@@ -101,6 +116,53 @@ def fetch_itunes_info(app_id):
         return None
 
 init_db()
+
+def save_rank_history(tab, apps):
+    today = datetime.now().strftime("%Y-%m-%d")
+    con = sqlite3.connect(DB_PATH)
+    cur = con.cursor()
+    cur.execute("SELECT COUNT(*) FROM rank_history WHERE tab=? AND date=?", (tab, today))
+    if cur.fetchone()[0] > 0:
+        con.close()
+        return
+    for a in apps:
+        cur.execute("""
+            INSERT INTO rank_history (tab, date, rank, app_id, name, icon, store, developer, category)
+            VALUES (?,?,?,?,?,?,?,?,?)
+        """, (tab, today, a["rank"], a["app_id"], a["name"], a["icon"],
+              a["store"], a.get("developer",""), a.get("category","")))
+    con.commit()
+    con.close()
+
+def get_prev_ranks(tab):
+    today = datetime.now().strftime("%Y-%m-%d")
+    con = sqlite3.connect(DB_PATH)
+    cur = con.cursor()
+    cur.execute("""
+        SELECT app_id, rank, date FROM rank_history
+        WHERE tab=? AND date < ? ORDER BY date DESC
+    """, (tab, today))
+    rows = cur.fetchall()
+    con.close()
+    seen = {}
+    for app_id, rank, date in rows:
+        if app_id not in seen:
+            seen[app_id] = rank
+    return seen
+
+def attach_rank_change(apps, tab):
+    prev = get_prev_ranks(tab)
+    for a in apps:
+        old = prev.get(a["app_id"])
+        if old is None:
+            a["change"] = "new"
+        elif old > a["rank"]:
+            a["change"] = f"+{old - a['rank']}"
+        elif old < a["rank"]:
+            a["change"] = f"-{a['rank'] - old}"
+        else:
+            a["change"] = "0"
+    return apps
 
 def fetch_apple_rss(feed, limit=50, store="appstore", id_prefix=""):
     url = f"https://itunes.apple.com/kr/rss/{feed}/limit={limit}/json"
@@ -232,6 +294,8 @@ def rankings():
     else:
         return jsonify([])
 
+    attach_rank_change(apps, tab)
+    save_rank_history(tab, apps)
     return jsonify(attach_votes(apps))
 
 @app.route("/api/vote", methods=["POST"])
@@ -269,6 +333,32 @@ def curate():
     con.commit()
     con.close()
     return jsonify({"ok": True})
+
+@app.route("/api/history")
+def history():
+    tab  = request.args.get("tab", "downloads")
+    date = request.args.get("date", "")
+    con  = sqlite3.connect(DB_PATH)
+    cur  = con.cursor()
+    if date:
+        cur.execute("""
+            SELECT rank, app_id, name, icon, store, developer, category
+            FROM rank_history WHERE tab=? AND date=? ORDER BY rank
+        """, (tab, date))
+    else:
+        cur.execute("""
+            SELECT DISTINCT date FROM rank_history
+            WHERE tab=? ORDER BY date DESC LIMIT 90
+        """, (tab,))
+        dates = [r[0] for r in cur.fetchall()]
+        con.close()
+        return jsonify(dates)
+    rows = cur.fetchall()
+    con.close()
+    return jsonify([{
+        "rank": r[0], "app_id": r[1], "name": r[2],
+        "icon": r[3], "store": r[4], "developer": r[5], "category": r[6]
+    } for r in rows])
 
 @app.route("/app/<app_id>")
 def app_detail(app_id):
