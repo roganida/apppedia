@@ -334,6 +334,53 @@ def curate():
     con.close()
     return jsonify({"ok": True})
 
+@app.route("/api/search")
+def search_apps():
+    q = request.args.get("q", "").strip()
+    if not q:
+        return jsonify([])
+    results = []
+    # App Store 검색
+    try:
+        r = requests.get(
+            "https://itunes.apple.com/search",
+            params={"term": q, "entity": "software", "limit": 10, "country": "kr", "lang": "ko_kr"},
+            timeout=8
+        )
+        for d in r.json().get("results", []):
+            results.append({
+                "app_id":    str(d["trackId"]),
+                "name":      d.get("trackName", ""),
+                "icon":      d.get("artworkUrl100", ""),
+                "developer": d.get("artistName", ""),
+                "category":  d.get("primaryGenreName", ""),
+                "store":     "appstore",
+                "url":       d.get("trackViewUrl", ""),
+                "rating":    round(d.get("averageUserRating") or 0, 1),
+            })
+    except Exception as ex:
+        print(f"AppStore search error: {ex}")
+    # Google Play 검색
+    try:
+        from google_play_scraper import search as gp_search
+        gp_results = gp_search(q, lang="ko", country="kr", n_hits=10)
+        for d in gp_results:
+            if not d.get("appId") or not d.get("title"):
+                continue
+            results.append({
+                "app_id":    "gp_" + d["appId"],
+                "name":      d["title"],
+                "icon":      d.get("icon") or "",
+                "developer": d.get("developer") or "",
+                "category":  d.get("genre") or "",
+                "store":     "googleplay",
+                "url":       f"https://play.google.com/store/apps/details?id={d['appId']}",
+                "rating":    round(d.get("score") or 0, 1),
+            })
+    except Exception as ex:
+        print(f"GooglePlay search error: {ex}")
+    return jsonify(results)
+
 @app.route("/api/history")
 def history():
     tab  = request.args.get("tab", "downloads")
