@@ -407,6 +407,10 @@ def history():
         "icon": r[3], "store": r[4], "developer": r[5], "category": r[6]
     } for r in rows])
 
+@app.route("/privacy")
+def privacy():
+    return render_template("privacy.html")
+
 @app.route("/app/<app_id>")
 def app_detail(app_id):
     return render_template("app_detail.html", app_id=app_id)
