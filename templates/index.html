@@ -146,6 +146,12 @@
     }
     .filter-select:focus { border-color: #00b4d8; }
 
+    /* 광고 슬롯 */
+    .ad-slot {
+      background: #f8fafc;
+      border: 1.5px dashed #e2e8f0;
+    }
+
     ::-webkit-scrollbar{ width:4px; }
     ::-webkit-scrollbar-track{ background:#f1f5f9; }
     ::-webkit-scrollbar-thumb{ background:#cbd5e1; border-radius:2px; }
@@ -208,7 +214,22 @@
     </div>
   </div>
 
-  <main class="max-w-5xl mx-auto px-4 py-8">
+  <!-- 광고 포함 3단 레이아웃 -->
+  <div class="flex gap-4 max-w-7xl mx-auto px-4 py-8 items-start">
+
+    <!-- 좌측 광고 -->
+    <aside class="hidden xl:flex flex-col gap-4 shrink-0 w-[160px] sticky top-20">
+      <!-- AdSense 준비 영역 (160x600) -->
+      <div class="ad-slot w-[160px] h-[600px] rounded-2xl flex flex-col items-center justify-center gap-2">
+        <svg class="w-6 h-6 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+        </svg>
+        <span class="text-[10px] text-gray-300 font-medium">광고 영역</span>
+        <span class="text-[9px] text-gray-200">160 × 600</span>
+      </div>
+    </aside>
+
+  <main class="flex-1 min-w-0">
 
     <!-- Tabs -->
     <div class="tab-wrap p-2 grid grid-cols-3 sm:grid-cols-6 gap-1.5 mb-6">
@@ -280,6 +301,28 @@
       App Store 공식 RSS · Google Play 데이터 기반 · 매 시간 자동 갱신
     </p>
   </main>
+
+    <!-- 우측 광고 -->
+    <aside class="hidden xl:flex flex-col gap-4 shrink-0 w-[160px] sticky top-20">
+      <!-- AdSense 준비 영역 (160x600) -->
+      <div class="ad-slot w-[160px] h-[600px] rounded-2xl flex flex-col items-center justify-center gap-2">
+        <svg class="w-6 h-6 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+        </svg>
+        <span class="text-[10px] text-gray-300 font-medium">광고 영역</span>
+        <span class="text-[9px] text-gray-200">160 × 600</span>
+      </div>
+      <!-- AdSense 준비 영역 (160x300) -->
+      <div class="ad-slot w-[160px] h-[300px] rounded-2xl flex flex-col items-center justify-center gap-2">
+        <svg class="w-6 h-6 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+        </svg>
+        <span class="text-[10px] text-gray-300 font-medium">광고 영역</span>
+        <span class="text-[9px] text-gray-200">160 × 300</span>
+      </div>
+    </aside>
+
+  </div><!-- end 3단 레이아웃 -->
 
   <script>
     let currentTab = 'downloads';
