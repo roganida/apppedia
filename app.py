@@ -407,6 +407,52 @@ def history():
         "icon": r[3], "store": r[4], "developer": r[5], "category": r[6]
     } for r in rows])
 
+@app.route("/weekly")
+def weekly():
+    return render_template("weekly.html")
+
+@app.route("/api/weekly")
+def api_weekly():
+    from datetime import datetime, timedelta
+    # 이번 주 월요일 ~ 오늘
+    today = datetime.now()
+    week_start = (today - timedelta(days=today.weekday())).strftime("%Y-%m-%d")
+    con = sqlite3.connect(DB_PATH)
+    cur = con.cursor()
+    # 이번 주 누적 투표 TOP 10
+    cur.execute("""
+        SELECT v.app_id, v.vote_count
+        FROM votes v ORDER BY v.vote_count DESC LIMIT 10
+    """)
+    rows = cur.fetchall()
+    con.close()
+    if not rows:
+        # 투표 데이터 없으면 다운로드 순위로 대체
+        apps = fetch_apple_rss("topfreeapplications", 10)
+        return jsonify(attach_votes(apps))
+    # app_id로 앱 정보 조회
+    result = []
+    for rank, (app_id, vote_count) in enumerate(rows, 1):
+        if app_id.startswith("gp_"):
+            info = {"name": app_id, "icon": "", "developer": "", "store": "googleplay",
+                    "url": "", "category": ""}
+        else:
+            info = fetch_itunes_info(app_id) or {}
+            info["store"] = "appstore"
+            info["url"] = info.get("url", "")
+        result.append({
+            "rank":       rank,
+            "app_id":     app_id,
+            "name":       info.get("name", ""),
+            "icon":       info.get("icon", ""),
+            "developer":  info.get("developer", ""),
+            "category":   info.get("category", ""),
+            "store":      info.get("store", "appstore"),
+            "url":        info.get("url", ""),
+            "votes":      vote_count,
+        })
+    return jsonify(result)
+
 @app.route("/privacy")
 def privacy():
     return render_template("privacy.html")
