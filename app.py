@@ -280,6 +280,39 @@ def fetch_games(limit=50):
     googleplay = fetch_googleplay_games(limit // 2)
     return interleave(appstore, googleplay, limit)
 
+def fetch_googleplay_new(limit=25):
+    keywords = ["신규 앱", "새로운 앱", "2025 출시", "최신 앱", "신작",
+                "새로 나온", "베타 앱", "런칭", "출시", "새 앱"]
+    try:
+        from google_play_scraper import search
+        seen = set()
+        apps = []
+        for kw in keywords:
+            if len(apps) >= limit:
+                break
+            results = search(kw, lang="ko", country="kr", n_hits=5)
+            for r in results:
+                if not r.get("appId") or not r.get("title"):
+                    continue
+                gp_id = "gp_" + r["appId"]
+                if gp_id in seen:
+                    continue
+                seen.add(gp_id)
+                apps.append({
+                    "app_id":    gp_id,
+                    "name":      r["title"],
+                    "icon":      r.get("icon") or "",
+                    "developer": r.get("developer") or "",
+                    "category":  r.get("genre") or "",
+                    "store":     "googleplay",
+                    "url":       f"https://play.google.com/store/apps/details?id={r['appId']}",
+                    "rank":      len(apps) + 1,
+                })
+        return apps[:limit]
+    except Exception as ex:
+        print(f"Google Play new fetch error: {ex}")
+        return []
+
 def fetch_googleplay_popular(limit=50):
     keywords = ["카카오", "네이버", "쿠팡", "배달의민족", "유튜브", "인스타그램",
                 "틱톡", "당근마켓", "토스", "카카오페이", "무신사", "올리브영",
@@ -380,7 +413,9 @@ def rankings():
     elif tab == "revenue":
         apps = fetch_apple_rss("topgrossingapplications", 50)
     elif tab == "new":
-        apps = fetch_apple_rss("newfreeapplications", 50)
+        appstore = fetch_apple_rss("newfreeapplications", 25)
+        googleplay = fetch_googleplay_new(25)
+        apps = interleave(appstore, googleplay, 50)
     elif tab == "googleplay":
         apps = fetch_googleplay_popular(50)
     elif tab == "games":
