@@ -187,6 +187,68 @@ def fetch_apple_rss(feed, limit=50, store="appstore", id_prefix=""):
         print(f"Apple RSS fetch error ({feed}): {ex}")
         return []
 
+def fetch_games(limit=50):
+    apps = []
+    seen = set()
+    # App Store games via iTunes Search API (genreId=6014)
+    try:
+        r = requests.get(
+            "https://itunes.apple.com/search",
+            params={"term": "게임", "entity": "software", "genreId": "6014",
+                    "limit": 30, "country": "kr", "lang": "ko_kr"},
+            timeout=8
+        )
+        for i, d in enumerate(r.json().get("results", [])):
+            app_id = str(d.get("trackId", ""))
+            if not app_id or app_id in seen:
+                continue
+            seen.add(app_id)
+            apps.append({
+                "app_id":    app_id,
+                "name":      d.get("trackName", ""),
+                "icon":      d.get("artworkUrl100", ""),
+                "developer": d.get("artistName", ""),
+                "category":  d.get("primaryGenreName", ""),
+                "store":     "appstore",
+                "url":       d.get("trackViewUrl", ""),
+                "rank":      len(apps) + 1,
+            })
+    except Exception as ex:
+        print(f"AppStore games fetch error: {ex}")
+    # Google Play games
+    try:
+        from google_play_scraper import search
+        game_keywords = ["브롤스타즈", "클래시오브클랜", "쿠키런킹덤", "메이플스토리M",
+                         "리니지M", "배틀그라운드모바일", "원신", "포켓몬GO", "카트라이더",
+                         "서머너즈워", "세븐나이츠", "로스트아크모바일"]
+        for kw in game_keywords:
+            if len(apps) >= limit:
+                break
+            results = search(kw, lang="ko", country="kr", n_hits=5)
+            for r in results:
+                if not r.get("appId") or not r.get("title"):
+                    continue
+                gp_id = "gp_" + r["appId"]
+                if gp_id in seen:
+                    continue
+                seen.add(gp_id)
+                apps.append({
+                    "app_id":    gp_id,
+                    "name":      r["title"],
+                    "icon":      r.get("icon") or "",
+                    "developer": r.get("developer") or "",
+                    "category":  r.get("genre") or "",
+                    "store":     "googleplay",
+                    "url":       f"https://play.google.com/store/apps/details?id={r['appId']}",
+                    "rank":      len(apps) + 1,
+                })
+    except Exception as ex:
+        print(f"Google Play games fetch error: {ex}")
+    # Re-number ranks
+    for i, a in enumerate(apps):
+        a["rank"] = i + 1
+    return apps[:limit]
+
 def fetch_googleplay_popular(limit=50):
     keywords = ["카카오", "네이버", "쿠팡", "배달의민족", "유튜브", "인스타그램",
                 "틱톡", "당근마켓", "토스", "카카오페이", "무신사", "올리브영",
@@ -282,6 +344,8 @@ def rankings():
         apps = fetch_apple_rss("newfreeapplications", 50)
     elif tab == "googleplay":
         apps = fetch_googleplay_popular(50)
+    elif tab == "games":
+        apps = fetch_games(50)
     elif tab == "votes":
         appstore = fetch_apple_rss("topfreeapplications", 50)
         gplay = fetch_googleplay_popular(30)
