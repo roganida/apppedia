@@ -148,9 +148,40 @@
 
       <!-- 하단 다운로드 버튼 -->
       <a id="app-store-btn2" href="#" target="_blank"
-        class="block w-full text-center py-4 rounded-2xl text-white font-bold text-base shadow-md transition-all hover:opacity-90 mb-8">
+        class="block w-full text-center py-4 rounded-2xl text-white font-bold text-base shadow-md transition-all hover:opacity-90 mb-6">
         <span id="store-label2"></span> 에서 다운로드
       </a>
+
+      <!-- 리뷰 섹션 -->
+      <div class="card p-5 mb-4">
+        <h2 class="text-sm font-bold text-gray-700 mb-4">💬 사용자 리뷰</h2>
+
+        <!-- 리뷰 작성 -->
+        <div class="bg-gray-50 rounded-2xl p-4 mb-5">
+          <p class="text-xs font-semibold text-gray-600 mb-3">리뷰 작성</p>
+          <input id="review-nickname" type="text" placeholder="닉네임 (최대 20자)"
+            class="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm outline-none focus:border-blue-400 mb-2" maxlength="20"/>
+          <div class="flex gap-1 mb-2" id="star-input">
+            <button onclick="setStar(1)" data-star="1" class="text-2xl text-gray-300 hover:text-yellow-400 transition-colors">★</button>
+            <button onclick="setStar(2)" data-star="2" class="text-2xl text-gray-300 hover:text-yellow-400 transition-colors">★</button>
+            <button onclick="setStar(3)" data-star="3" class="text-2xl text-gray-300 hover:text-yellow-400 transition-colors">★</button>
+            <button onclick="setStar(4)" data-star="4" class="text-2xl text-gray-300 hover:text-yellow-400 transition-colors">★</button>
+            <button onclick="setStar(5)" data-star="5" class="text-2xl text-gray-300 hover:text-yellow-400 transition-colors">★</button>
+          </div>
+          <textarea id="review-comment" placeholder="앱 사용 후기를 남겨주세요 (최대 200자)"
+            class="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm outline-none focus:border-blue-400 resize-none h-20 mb-2" maxlength="200"></textarea>
+          <button onclick="submitReview()"
+            class="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm transition-all">
+            리뷰 등록
+          </button>
+          <p id="review-msg" class="text-xs text-center mt-2 hidden"></p>
+        </div>
+
+        <!-- 리뷰 목록 -->
+        <div id="review-list" class="space-y-3">
+          <p class="text-sm text-gray-400 text-center py-4">리뷰를 불러오는 중...</p>
+        </div>
+      </div>
     </div>
 
     <!-- 에러 -->
@@ -242,6 +273,81 @@
     }
 
     loadApp();
+
+    // ── 리뷰 ──────────────────────────────────────────
+    let selectedStar = 0;
+
+    function setStar(n) {
+      selectedStar = n;
+      document.querySelectorAll('#star-input button').forEach(btn => {
+        btn.classList.toggle('text-yellow-400', parseInt(btn.dataset.star) <= n);
+        btn.classList.toggle('text-gray-300',   parseInt(btn.dataset.star) > n);
+      });
+    }
+
+    async function loadReviews() {
+      const el = document.getElementById('review-list');
+      try {
+        const res  = await fetch(`/api/reviews/${appId}`);
+        const list = await res.json();
+        if (!list.length) {
+          el.innerHTML = '<p class="text-sm text-gray-400 text-center py-4">아직 리뷰가 없어요. 첫 리뷰를 남겨보세요!</p>';
+          return;
+        }
+        el.innerHTML = list.map(r => `
+          <div class="border border-gray-100 rounded-2xl p-4">
+            <div class="flex items-center justify-between mb-1">
+              <span class="font-semibold text-sm text-gray-800">${escHtml(r.nickname)}</span>
+              <span class="text-xs text-gray-400">${r.created_at}</span>
+            </div>
+            <div class="text-yellow-400 text-sm mb-1">${'★'.repeat(r.rating)}${'☆'.repeat(5-r.rating)}</div>
+            <p class="text-sm text-gray-600 leading-relaxed">${escHtml(r.comment)}</p>
+          </div>`).join('');
+      } catch(e) {
+        el.innerHTML = '<p class="text-sm text-gray-400 text-center py-4">리뷰를 불러오지 못했어요</p>';
+      }
+    }
+
+    async function submitReview() {
+      const nickname = document.getElementById('review-nickname').value.trim();
+      const comment  = document.getElementById('review-comment').value.trim();
+      const msg      = document.getElementById('review-msg');
+      if (!nickname) { showMsg('닉네임을 입력해주세요', 'red'); return; }
+      if (!selectedStar) { showMsg('별점을 선택해주세요', 'red'); return; }
+      if (!comment) { showMsg('리뷰 내용을 입력해주세요', 'red'); return; }
+      try {
+        const res = await fetch(`/api/reviews/${appId}`, {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({nickname, rating: selectedStar, comment})
+        });
+        const data = await res.json();
+        if (data.ok) {
+          document.getElementById('review-nickname').value = '';
+          document.getElementById('review-comment').value = '';
+          setStar(0); selectedStar = 0;
+          showMsg('리뷰가 등록됐어요!', 'green');
+          loadReviews();
+        } else {
+          showMsg(data.error || '오류가 발생했어요', 'red');
+        }
+      } catch(e) { showMsg('오류가 발생했어요', 'red'); }
+    }
+
+    function showMsg(text, color) {
+      const msg = document.getElementById('review-msg');
+      msg.textContent = text;
+      msg.className = `text-xs text-center mt-2 text-${color}-500`;
+      msg.classList.remove('hidden');
+      setTimeout(() => msg.classList.add('hidden'), 3000);
+    }
+
+    function escHtml(s) {
+      return String(s||'').replace(/[&<>"']/g, c =>
+        ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+
+    loadReviews();
   </script>
 </body>
 </html>

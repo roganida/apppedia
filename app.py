@@ -95,6 +95,17 @@ def init_db():
         )
     """)
     cur.execute("CREATE INDEX IF NOT EXISTS idx_history_tab_date ON rank_history(tab, date)")
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS reviews (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            app_id     TEXT,
+            nickname   TEXT,
+            rating     INTEGER,
+            comment    TEXT,
+            created_at TEXT
+        )
+    """)
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_reviews_app_id ON reviews(app_id)")
     con.commit()
     # 샘플 데이터 없으면 채우기
     cur.execute("SELECT COUNT(*) FROM curated")
@@ -688,6 +699,39 @@ def api_app_detail(app_id):
             })
         except Exception as ex:
             return jsonify({"error": str(ex)}), 404
+
+@app.route("/api/reviews/<app_id>")
+def get_reviews(app_id):
+    con = sqlite3.connect(DB_PATH)
+    cur = con.cursor()
+    cur.execute("""
+        SELECT id, nickname, rating, comment, created_at
+        FROM reviews WHERE app_id=? ORDER BY created_at DESC LIMIT 50
+    """, (app_id,))
+    rows = cur.fetchall()
+    con.close()
+    return jsonify([{
+        "id": r[0], "nickname": r[1], "rating": r[2],
+        "comment": r[3], "created_at": r[4][:10]
+    } for r in rows])
+
+@app.route("/api/reviews/<app_id>", methods=["POST"])
+def post_review(app_id):
+    data     = request.get_json()
+    nickname = (data.get("nickname") or "").strip()[:20]
+    rating   = int(data.get("rating") or 0)
+    comment  = (data.get("comment") or "").strip()[:200]
+    if not nickname or not comment or not (1 <= rating <= 5):
+        return jsonify({"error": "입력값을 확인해주세요"}), 400
+    con = sqlite3.connect(DB_PATH)
+    cur = con.cursor()
+    cur.execute("""
+        INSERT INTO reviews (app_id, nickname, rating, comment, created_at)
+        VALUES (?,?,?,?,?)
+    """, (app_id, nickname, rating, comment, datetime.now().isoformat()))
+    con.commit()
+    con.close()
+    return jsonify({"ok": True})
 
 @app.route("/admin", methods=["GET", "POST"])
 def admin():
