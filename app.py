@@ -3,7 +3,22 @@ from flask_cors import CORS
 import requests
 import sqlite3
 import os
+import time
 from datetime import datetime
+
+_cache = {}
+_CACHE_TTL = 3600  # 1시간
+
+def cache_get(key):
+    if key in _cache:
+        data, ts = _cache[key]
+        if time.time() - ts < _CACHE_TTL:
+            return data
+        del _cache[key]
+    return None
+
+def cache_set(key, data):
+    _cache[key] = (data, time.time())
 
 app = Flask(__name__)
 CORS(app)
@@ -352,6 +367,12 @@ def index():
 def rankings():
     tab = request.args.get("tab", "downloads")
 
+    # 캐시에서 바로 반환 (votes·curated 제외 — 실시간성 필요)
+    if tab not in ("votes", "curated"):
+        cached = cache_get(f"rankings_{tab}")
+        if cached is not None:
+            return jsonify(cached)
+
     if tab == "downloads":
         appstore = fetch_apple_rss("topfreeapplications", 25)
         googleplay = fetch_googleplay_popular(25)
@@ -378,7 +399,13 @@ def rankings():
 
     attach_rank_change(apps, tab)
     save_rank_history(tab, apps)
-    return jsonify(attach_votes(apps))
+    result = attach_votes(apps)
+    cache_set(f"rankings_{tab}", result)
+    return jsonify(result)
+
+@app.route("/ping")
+def ping():
+    return jsonify({"status": "ok", "time": datetime.now().isoformat()})
 
 @app.route("/api/vote", methods=["POST"])
 def vote():
