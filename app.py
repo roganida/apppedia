@@ -1,10 +1,12 @@
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, jsonify, request, session, redirect, url_for
 from flask_cors import CORS
 import requests
 import sqlite3
 import os
 import time
 from datetime import datetime
+
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "apppedia2026")
 
 _cache = {}
 _CACHE_TTL = 3600  # 1시간
@@ -21,6 +23,7 @@ def cache_set(key, data):
     _cache[key] = (data, time.time())
 
 app = Flask(__name__)
+app.secret_key = os.environ.get("SECRET_KEY", "apppedia-secret-2026")
 CORS(app)
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "appranking.db")
@@ -685,6 +688,74 @@ def api_app_detail(app_id):
             })
         except Exception as ex:
             return jsonify({"error": str(ex)}), 404
+
+@app.route("/admin", methods=["GET", "POST"])
+def admin():
+    if request.method == "POST" and "password" in request.form:
+        if request.form["password"] == ADMIN_PASSWORD:
+            session["admin"] = True
+        else:
+            return render_template("admin.html", error="비밀번호가 틀렸어요", logged_in=False, collections=COLLECTIONS)
+    if not session.get("admin"):
+        return render_template("admin.html", logged_in=False, collections=COLLECTIONS)
+    curated = get_curated()
+    return render_template("admin.html", logged_in=True, collections=COLLECTIONS, curated=curated)
+
+@app.route("/admin/logout")
+def admin_logout():
+    session.pop("admin", None)
+    return redirect("/admin")
+
+@app.route("/admin/add", methods=["POST"])
+def admin_add():
+    if not session.get("admin"):
+        return jsonify({"error": "unauthorized"}), 401
+    data = request.get_json()
+    app_id     = data.get("app_id", "").strip()
+    collection = data.get("collection", "").strip()
+    store      = data.get("store", "appstore")
+    if not app_id or not collection:
+        return jsonify({"error": "missing fields"}), 400
+    # 앱 정보 가져오기
+    if store == "appstore":
+        info = fetch_itunes_info(app_id)
+    else:
+        try:
+            from google_play_scraper import app as gp_app
+            gp_id = app_id[3:] if app_id.startswith("gp_") else app_id
+            app_id = "gp_" + gp_id
+            d = gp_app(gp_id, lang="ko", country="kr")
+            info = {"name": d.get("title",""), "icon": d.get("icon",""),
+                    "developer": d.get("developer",""), "category": d.get("genre",""),
+                    "url": f"https://play.google.com/store/apps/details?id={gp_id}"}
+        except:
+            info = None
+    if not info:
+        return jsonify({"error": "앱 정보를 찾지 못했어요"}), 404
+    con = sqlite3.connect(DB_PATH)
+    cur = con.cursor()
+    cur.execute("""
+        INSERT OR REPLACE INTO curated (app_id, collection, name, icon, developer, category, store, url, added_at)
+        VALUES (?,?,?,?,?,?,?,?,?)
+    """, (app_id, collection, info["name"], info["icon"], info["developer"],
+          info["category"], store, info["url"], datetime.now().isoformat()))
+    con.commit()
+    con.close()
+    return jsonify({"ok": True, "name": info["name"]})
+
+@app.route("/admin/delete", methods=["POST"])
+def admin_delete():
+    if not session.get("admin"):
+        return jsonify({"error": "unauthorized"}), 401
+    data = request.get_json()
+    app_id     = data.get("app_id")
+    collection = data.get("collection")
+    con = sqlite3.connect(DB_PATH)
+    cur = con.cursor()
+    cur.execute("DELETE FROM curated WHERE app_id=? AND collection=?", (app_id, collection))
+    con.commit()
+    con.close()
+    return jsonify({"ok": True})
 
 @app.route("/sitemap.xml")
 def sitemap():

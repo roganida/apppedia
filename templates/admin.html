@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>관리자 — 앱과사전</title>
+  <meta name="robots" content="noindex, nofollow" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background: #f5f7fa; color: #1a1a2e; }
+    .hero-accent { background: linear-gradient(135deg, #00b4d8, #0077b6, #023e8a); }
+    .card { background:#fff; border:1px solid #e8eaf0; border-radius:16px; box-shadow:0 1px 4px rgba(0,0,0,0.05); }
+    .store-badge-appstore   { background:#0077b6; color:#fff; }
+    .store-badge-googleplay { background:#01875f; color:#fff; }
+  </style>
+</head>
+<body class="min-h-screen font-sans">
+
+  <!-- Header -->
+  <header class="bg-white border-b border-gray-200 sticky top-0 z-50">
+    <div class="max-w-4xl mx-auto px-4 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl flex items-center justify-center text-xl hero-accent shadow-sm">📱</div>
+        <span class="text-lg font-extrabold text-gray-900">앱과사전 관리자</span>
+      </div>
+      {% if logged_in %}
+      <a href="/admin/logout" class="text-sm text-red-500 hover:text-red-700 font-medium">로그아웃</a>
+      {% endif %}
+    </div>
+  </header>
+
+  <main class="max-w-4xl mx-auto px-4 py-8">
+
+    {% if not logged_in %}
+    <!-- 로그인 -->
+    <div class="max-w-sm mx-auto mt-20">
+      <div class="card p-8">
+        <h1 class="text-xl font-extrabold text-gray-900 mb-6 text-center">관리자 로그인</h1>
+        {% if error %}
+        <p class="text-red-500 text-sm text-center mb-4">{{ error }}</p>
+        {% endif %}
+        <form method="POST">
+          <input type="password" name="password" placeholder="비밀번호"
+            class="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm outline-none focus:border-blue-400 mb-4"
+            autofocus />
+          <button type="submit"
+            class="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm transition-all">
+            로그인
+          </button>
+        </form>
+      </div>
+    </div>
+
+    {% else %}
+    <!-- 관리자 메인 -->
+
+    <!-- 앱 추가 -->
+    <div class="card p-6 mb-6">
+      <h2 class="text-base font-bold text-gray-900 mb-4">➕ 에디터픽에 앱 추가</h2>
+      <div class="flex gap-3 flex-wrap mb-3">
+        <select id="add-collection" class="px-3 py-2 rounded-xl border border-gray-200 text-sm outline-none focus:border-blue-400">
+          {% for col in collections %}
+          <option value="{{ col.id }}">{{ col.emoji }} {{ col.title }}</option>
+          {% endfor %}
+        </select>
+        <select id="add-store" class="px-3 py-2 rounded-xl border border-gray-200 text-sm outline-none focus:border-blue-400">
+          <option value="appstore">App Store</option>
+          <option value="googleplay">Google Play</option>
+        </select>
+      </div>
+      <div class="flex gap-3">
+        <input id="add-appid" type="text" placeholder="앱 ID 입력 (App Store: 숫자, Google Play: com.xxx.xxx)"
+          class="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-sm outline-none focus:border-blue-400" />
+        <button onclick="addApp()"
+          class="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm transition-all">
+          추가
+        </button>
+      </div>
+      <p id="add-msg" class="text-sm mt-2 hidden"></p>
+      <p class="text-xs text-gray-400 mt-3">
+        App Store ID 예: 362057947 (카카오톡) · Google Play ID 예: com.kakao.talk
+      </p>
+    </div>
+
+    <!-- 검색으로 앱 찾기 -->
+    <div class="card p-6 mb-6">
+      <h2 class="text-base font-bold text-gray-900 mb-4">🔍 앱 검색으로 ID 찾기</h2>
+      <div class="flex gap-3">
+        <input id="search-q" type="text" placeholder="앱 이름으로 검색..."
+          class="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-sm outline-none focus:border-blue-400"
+          onkeydown="if(event.key==='Enter') doSearch()" />
+        <button onclick="doSearch()"
+          class="px-5 py-2.5 rounded-xl bg-gray-700 hover:bg-gray-800 text-white font-bold text-sm transition-all">
+          검색
+        </button>
+      </div>
+      <div id="search-results" class="mt-4 space-y-2 hidden"></div>
+    </div>
+
+    <!-- 현재 에디터픽 -->
+    <div class="card p-6">
+      <h2 class="text-base font-bold text-gray-900 mb-4">⭐ 현재 에디터픽</h2>
+      {% for col in curated %}
+      <div class="mb-6">
+        <div class="flex items-center gap-2 mb-3">
+          <span class="text-xl">{{ col.emoji }}</span>
+          <span class="font-bold text-gray-800">{{ col.title }}</span>
+          <span class="text-xs text-gray-400">({{ col.apps|length }}개)</span>
+        </div>
+        {% if col.apps %}
+        <div class="space-y-2">
+          {% for app in col.apps %}
+          <div class="flex items-center gap-3 px-4 py-3 bg-gray-50 rounded-xl">
+            <img src="{{ app.icon }}" class="w-10 h-10 rounded-xl object-cover bg-gray-200 shrink-0"
+              onerror="this.src='https://placehold.co/40x40/e2e8f0/94a3b8?text=App'" />
+            <div class="flex-1 min-w-0">
+              <div class="font-semibold text-sm text-gray-900 truncate">{{ app.name }}</div>
+              <div class="text-xs text-gray-400">{{ app.developer }} · {{ app.app_id }}</div>
+            </div>
+            <span class="text-[10px] px-1.5 py-0.5 rounded-md font-semibold shrink-0
+              {% if app.store == 'appstore' %}store-badge-appstore{% else %}store-badge-googleplay{% endif %}">
+              {{ 'App Store' if app.store == 'appstore' else 'Google Play' }}
+            </span>
+            <button onclick="deleteApp('{{ app.app_id }}', '{{ col.id }}')"
+              class="text-red-400 hover:text-red-600 text-sm font-bold shrink-0 px-2">삭제</button>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-sm text-gray-400">앱이 없어요</p>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+
+    {% endif %}
+  </main>
+
+  {% if logged_in %}
+  <script>
+    async function addApp() {
+      const appId      = document.getElementById('add-appid').value.trim();
+      const collection = document.getElementById('add-collection').value;
+      const store      = document.getElementById('add-store').value;
+      const msg        = document.getElementById('add-msg');
+      if (!appId) return;
+      msg.className = 'text-sm mt-2 text-gray-500';
+      msg.textContent = '추가 중...';
+      msg.classList.remove('hidden');
+      try {
+        const res = await fetch('/admin/add', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({app_id: appId, collection, store})
+        });
+        const data = await res.json();
+        if (data.ok) {
+          msg.className = 'text-sm mt-2 text-green-600';
+          msg.textContent = `✅ "${data.name}" 추가 완료! 페이지를 새로고침하세요.`;
+          document.getElementById('add-appid').value = '';
+        } else {
+          msg.className = 'text-sm mt-2 text-red-500';
+          msg.textContent = `❌ ${data.error}`;
+        }
+      } catch(e) {
+        msg.className = 'text-sm mt-2 text-red-500';
+        msg.textContent = '❌ 오류가 발생했어요';
+      }
+    }
+
+    async function deleteApp(appId, collection) {
+      if (!confirm('정말 삭제할까요?')) return;
+      try {
+        const res = await fetch('/admin/delete', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({app_id: appId, collection})
+        });
+        const data = await res.json();
+        if (data.ok) location.reload();
+      } catch(e) { alert('오류가 발생했어요'); }
+    }
+
+    async function doSearch() {
+      const q = document.getElementById('search-q').value.trim();
+      if (!q) return;
+      const el = document.getElementById('search-results');
+      el.classList.remove('hidden');
+      el.innerHTML = '<p class="text-sm text-gray-400">검색 중...</p>';
+      try {
+        const res  = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+        const apps = await res.json();
+        if (!apps.length) { el.innerHTML = '<p class="text-sm text-gray-400">결과 없음</p>'; return; }
+        el.innerHTML = apps.map(app => {
+          const rawId = app.store === 'googleplay' ? app.app_id.replace('gp_','') : app.app_id;
+          return `
+            <div class="flex items-center gap-3 px-4 py-3 bg-gray-50 rounded-xl">
+              <img src="${app.icon}" class="w-10 h-10 rounded-xl object-cover bg-gray-200 shrink-0"
+                onerror="this.src='https://placehold.co/40x40/e2e8f0/94a3b8?text=App'"/>
+              <div class="flex-1 min-w-0">
+                <div class="font-semibold text-sm text-gray-900 truncate">${app.name}</div>
+                <div class="text-xs text-gray-400">${app.developer}</div>
+              </div>
+              <code class="text-xs bg-gray-200 px-2 py-1 rounded-lg text-gray-600 shrink-0">${rawId}</code>
+              <button onclick="fillId('${rawId}','${app.store}')"
+                class="text-xs px-3 py-1.5 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 shrink-0">
+                선택
+              </button>
+            </div>`;
+        }).join('');
+      } catch(e) { el.innerHTML = '<p class="text-sm text-red-400">오류 발생</p>'; }
+    }
+
+    function fillId(appId, store) {
+      document.getElementById('add-appid').value = appId;
+      document.getElementById('add-store').value = store;
+      document.getElementById('add-appid').scrollIntoView({behavior:'smooth'});
+    }
+  </script>
+  {% endif %}
+</body>
+</html>
