@@ -625,7 +625,7 @@ def sitemap():
     xml = '''<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://apppedia.onrender.com/</loc>
+    <loc>https://www.apppedia.co.kr/</loc>
     <changefreq>hourly</changefreq>
     <priority>1.0</priority>
   </url>
@@ -636,7 +636,7 @@ def sitemap():
 def robots():
     txt = """User-agent: *
 Allow: /
-Sitemap: https://apppedia.onrender.com/sitemap.xml"""
+Sitemap: https://www.apppedia.co.kr/sitemap.xml"""
     return app.response_class(txt, mimetype="text/plain")
 
 if __name__ == "__main__":
