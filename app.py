@@ -568,7 +568,38 @@ def privacy():
 
 @app.route("/app/<app_id>")
 def app_detail(app_id):
-    return render_template("app_detail.html", app_id=app_id)
+    app_data = {}
+    try:
+        if app_id.startswith("gp_"):
+            gp_id = app_id[3:]
+            from google_play_scraper import app as gp_app
+            d = gp_app(gp_id, lang="ko", country="kr")
+            app_data = {
+                "name":        d.get("title", ""),
+                "icon":        d.get("icon", ""),
+                "developer":   d.get("developer", ""),
+                "category":    d.get("genre", ""),
+                "description": (d.get("description") or "")[:200],
+                "store":       "googleplay",
+                "url":         f"https://play.google.com/store/apps/details?id={gp_id}",
+            }
+        else:
+            r = requests.get(f"https://itunes.apple.com/kr/lookup?id={app_id}", timeout=8)
+            results = r.json().get("results", [])
+            if results:
+                d = results[0]
+                app_data = {
+                    "name":        d.get("trackName", ""),
+                    "icon":        d.get("artworkUrl100", ""),
+                    "developer":   d.get("artistName", ""),
+                    "category":    d.get("primaryGenreName", ""),
+                    "description": (d.get("description") or "")[:200],
+                    "store":       "appstore",
+                    "url":         d.get("trackViewUrl", ""),
+                }
+    except:
+        pass
+    return render_template("app_detail.html", app_id=app_id, app=app_data)
 
 @app.route("/api/app/<app_id>")
 def api_app_detail(app_id):
