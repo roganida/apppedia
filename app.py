@@ -187,18 +187,28 @@ def fetch_apple_rss(feed, limit=50, store="appstore", id_prefix=""):
         print(f"Apple RSS fetch error ({feed}): {ex}")
         return []
 
-def fetch_games(limit=50):
+def interleave(list_a, list_b, limit=50):
+    result = []
+    for a, b in zip(list_a, list_b):
+        result.append(a)
+        result.append(b)
+    for item in list_a[len(list_b):] + list_b[len(list_a):]:
+        result.append(item)
+    for i, a in enumerate(result):
+        a["rank"] = i + 1
+    return result[:limit]
+
+def fetch_appstore_games(limit=25):
     apps = []
-    seen = set()
-    # App Store games via iTunes Search API (genreId=6014)
     try:
         r = requests.get(
             "https://itunes.apple.com/search",
             params={"term": "게임", "entity": "software", "genreId": "6014",
-                    "limit": 30, "country": "kr", "lang": "ko_kr"},
+                    "limit": limit, "country": "kr", "lang": "ko_kr"},
             timeout=8
         )
-        for i, d in enumerate(r.json().get("results", [])):
+        seen = set()
+        for d in r.json().get("results", []):
             app_id = str(d.get("trackId", ""))
             if not app_id or app_id in seen:
                 continue
@@ -215,7 +225,11 @@ def fetch_games(limit=50):
             })
     except Exception as ex:
         print(f"AppStore games fetch error: {ex}")
-    # Google Play games
+    return apps
+
+def fetch_googleplay_games(limit=25):
+    apps = []
+    seen = set()
     try:
         from google_play_scraper import search
         game_keywords = ["브롤스타즈", "클래시오브클랜", "쿠키런킹덤", "메이플스토리M",
@@ -244,10 +258,12 @@ def fetch_games(limit=50):
                 })
     except Exception as ex:
         print(f"Google Play games fetch error: {ex}")
-    # Re-number ranks
-    for i, a in enumerate(apps):
-        a["rank"] = i + 1
     return apps[:limit]
+
+def fetch_games(limit=50):
+    appstore = fetch_appstore_games(limit // 2)
+    googleplay = fetch_googleplay_games(limit // 2)
+    return interleave(appstore, googleplay, limit)
 
 def fetch_googleplay_popular(limit=50):
     keywords = ["카카오", "네이버", "쿠팡", "배달의민족", "유튜브", "인스타그램",
@@ -337,7 +353,9 @@ def rankings():
     tab = request.args.get("tab", "downloads")
 
     if tab == "downloads":
-        apps = fetch_apple_rss("topfreeapplications", 50)
+        appstore = fetch_apple_rss("topfreeapplications", 25)
+        googleplay = fetch_googleplay_popular(25)
+        apps = interleave(appstore, googleplay, 50)
     elif tab == "revenue":
         apps = fetch_apple_rss("topgrossingapplications", 50)
     elif tab == "new":
