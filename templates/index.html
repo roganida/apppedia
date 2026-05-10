@@ -189,9 +189,10 @@
           <span id="today-date" class="text-xs text-white/50 font-normal"></span>
         </span>
       </div>
-      <p class="text-blue-100 text-sm sm:text-base mb-8">
-        App Store · Google Play 실시간 차트 + 사용자 투표 + 에디터 픽
-      </p>
+      <div class="mb-8 space-y-1">
+        <p class="text-blue-100 text-sm sm:text-base">App Store · Google Play</p>
+        <p class="text-blue-200 text-xs sm:text-sm">사용자 투표 · 에디터 픽 · 주간 순위</p>
+      </div>
       <!-- 검색창 -->
       <div class="relative">
         <input id="search-input" type="text" placeholder="앱 이름으로 검색하세요..."
@@ -443,19 +444,22 @@
       const storeBadge = app.store === 'appstore'
         ? `<span class="store-badge-appstore text-[10px] px-1.5 py-0.5 rounded-md font-semibold">App Store</span>`
         : `<span class="store-badge-googleplay text-[10px] px-1.5 py-0.5 rounded-md font-semibold">Google Play</span>`;
-      const changeBadge = app.change === 'new'
-        ? `<span class="text-[10px] px-1.5 py-0.5 rounded-md font-bold bg-purple-100 text-purple-600">NEW</span>`
+      const changeEl = app.change === 'new'
+        ? `<span class="text-[9px] font-bold text-purple-500">NEW</span>`
         : app.change && app.change.startsWith('+')
-        ? `<span class="text-[10px] px-1.5 py-0.5 rounded-md font-bold bg-green-100 text-green-600">▲${app.change.slice(1)}</span>`
+        ? `<span class="text-[9px] font-bold text-green-500">▲${app.change.slice(1)}</span>`
         : app.change && app.change.startsWith('-')
-        ? `<span class="text-[10px] px-1.5 py-0.5 rounded-md font-bold bg-red-100 text-red-500">▼${app.change.slice(1)}</span>`
-        : `<span class="text-[10px] px-1.5 py-0.5 rounded-md font-bold bg-gray-100 text-gray-400">-</span>`;
+        ? `<span class="text-[9px] font-bold text-red-400">▼${app.change.slice(1)}</span>`
+        : `<span class="text-[9px] text-gray-300">—</span>`;
       const voted = votedSet.has(app.app_id);
       const voteColor = voted ? 'text-blue-500' : 'text-gray-300 hover:text-blue-400';
 
       return `
         <div class="app-card px-4 py-3 flex items-center gap-4">
-          <div class="rank-badge ${rankClass} shrink-0">${i}</div>
+          <div class="flex flex-col items-center shrink-0 w-8">
+            <div class="rank-badge ${rankClass}">${i}</div>
+            <div class="mt-0.5">${changeEl}</div>
+          </div>
           <a href="/app/${escHtml(app.app_id)}" class="flex items-center gap-4 flex-1 min-w-0">
           <img src="${app.icon}" alt="${escHtml(app.name)}"
             class="w-12 h-12 rounded-2xl shrink-0 object-cover bg-gray-100"
@@ -464,7 +468,6 @@
             <div class="flex items-center gap-2 flex-wrap">
               <span class="font-semibold text-sm text-gray-900 truncate hover:text-blue-600 transition-colors">${escHtml(app.name)}</span>
               ${storeBadge}
-              ${changeBadge}
             </div>
             <div class="text-xs text-gray-400 truncate mt-0.5">${escHtml(app.developer || '')} · ${escHtml(app.category || '')}</div>
           </div>
