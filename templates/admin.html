@@ -54,6 +54,30 @@
     {% else %}
     <!-- 관리자 메인 -->
 
+    <!-- 트렌드 글쓰기 -->
+    <div class="card p-6 mb-6">
+      <h2 class="text-base font-bold text-gray-900 mb-4">📈 트렌드 글 작성</h2>
+      <input id="post-title" type="text" placeholder="제목"
+        class="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm outline-none focus:border-blue-400 mb-2"/>
+      <input id="post-thumbnail" type="text" placeholder="썸네일 이미지 URL (선택)"
+        class="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm outline-none focus:border-blue-400 mb-2"/>
+      <textarea id="post-content" placeholder="내용을 입력하세요..."
+        class="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm outline-none focus:border-blue-400 resize-none h-40 mb-2"></textarea>
+      <button onclick="submitPost()"
+        class="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm transition-all">
+        글 등록
+      </button>
+      <p id="post-msg" class="text-sm mt-2 hidden"></p>
+    </div>
+
+    <!-- 트렌드 글 목록 -->
+    <div class="card p-6 mb-6">
+      <h2 class="text-base font-bold text-gray-900 mb-4">📋 등록된 트렌드 글</h2>
+      <div id="post-list" class="space-y-2">
+        <p class="text-sm text-gray-400">불러오는 중...</p>
+      </div>
+    </div>
+
     <!-- 앱 추가 -->
     <div class="card p-6 mb-6">
       <h2 class="text-base font-bold text-gray-900 mb-4">➕ 에디터픽에 앱 추가</h2>
@@ -138,6 +162,58 @@
 
   {% if logged_in %}
   <script>
+    async function submitPost() {
+      const title     = document.getElementById('post-title').value.trim();
+      const content   = document.getElementById('post-content').value.trim();
+      const thumbnail = document.getElementById('post-thumbnail').value.trim();
+      const msg       = document.getElementById('post-msg');
+      if (!title || !content) {
+        msg.className = 'text-sm mt-2 text-red-500'; msg.textContent = '❌ 제목과 내용을 입력해주세요';
+        msg.classList.remove('hidden'); return;
+      }
+      try {
+        const res = await fetch('/admin/post', {
+          method: 'POST', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({title, content, thumbnail})
+        });
+        const data = await res.json();
+        if (data.ok) {
+          document.getElementById('post-title').value = '';
+          document.getElementById('post-content').value = '';
+          document.getElementById('post-thumbnail').value = '';
+          msg.className = 'text-sm mt-2 text-green-600';
+          msg.textContent = '✅ 글이 등록됐어요!';
+          msg.classList.remove('hidden');
+          loadPosts();
+        }
+      } catch(e) { msg.className='text-sm mt-2 text-red-500'; msg.textContent='❌ 오류 발생'; msg.classList.remove('hidden'); }
+    }
+
+    async function loadPosts() {
+      const el = document.getElementById('post-list');
+      try {
+        const res = await fetch('/api/posts');
+        const posts = await res.json();
+        if (!posts.length) { el.innerHTML = '<p class="text-sm text-gray-400">등록된 글이 없어요</p>'; return; }
+        el.innerHTML = posts.map(p => `
+          <div class="flex items-center justify-between px-4 py-3 bg-gray-50 rounded-xl">
+            <div>
+              <a href="/post/${p.id}" target="_blank" class="font-semibold text-sm text-gray-900 hover:text-blue-600">${p.title}</a>
+              <div class="text-xs text-gray-400 mt-0.5">${p.created_at}</div>
+            </div>
+            <button onclick="deletePost(${p.id})" class="text-red-400 hover:text-red-600 text-sm font-bold px-2">삭제</button>
+          </div>`).join('');
+      } catch(e) { el.innerHTML = '<p class="text-sm text-red-400">불러오기 실패</p>'; }
+    }
+
+    async function deletePost(id) {
+      if (!confirm('정말 삭제할까요?')) return;
+      await fetch(`/admin/post/${id}/delete`, {method:'POST', headers:{'Content-Type':'application/json'}});
+      loadPosts();
+    }
+
+    loadPosts();
+
     async function addApp() {
       const appId      = document.getElementById('add-appid').value.trim();
       const collection = document.getElementById('add-collection').value;

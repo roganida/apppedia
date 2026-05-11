@@ -106,6 +106,15 @@ def init_db():
         )
     """)
     cur.execute("CREATE INDEX IF NOT EXISTS idx_reviews_app_id ON reviews(app_id)")
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS posts (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            title      TEXT,
+            content    TEXT,
+            thumbnail  TEXT,
+            created_at TEXT
+        )
+    """)
     con.commit()
     # 샘플 데이터 없으면 채우기
     cur.execute("SELECT COUNT(*) FROM curated")
@@ -415,13 +424,17 @@ def rankings():
     tab = request.args.get("tab", "downloads")
 
     # 캐시에서 바로 반환 (votes·curated 제외 — 실시간성 필요)
+    paid = request.args.get("paid") == "true"
+    cache_key = f"rankings_{tab}_{'paid' if paid else 'free'}"
     if tab not in ("votes", "curated"):
-        cached = cache_get(f"rankings_{tab}")
+        cached = cache_get(cache_key)
         if cached is not None:
             return jsonify(cached)
 
     if tab == "downloads":
-        appstore = fetch_apple_rss("topfreeapplications", 25)
+        paid = request.args.get("paid") == "true"
+        feed = "toppaidapplications" if paid else "topfreeapplications"
+        appstore  = fetch_apple_rss(feed, 25)
         googleplay = fetch_googleplay_popular(25)
         apps = interleave(appstore, googleplay, 50)
     elif tab == "revenue":
@@ -449,7 +462,7 @@ def rankings():
     attach_rank_change(apps, tab)
     save_rank_history(tab, apps)
     result = attach_votes(apps)
-    cache_set(f"rankings_{tab}", result)
+    cache_set(cache_key, result)
     return jsonify(result)
 
 @app.route("/ping")
@@ -700,6 +713,30 @@ def api_app_detail(app_id):
         except Exception as ex:
             return jsonify({"error": str(ex)}), 404
 
+@app.route("/api/posts")
+def get_posts():
+    con = sqlite3.connect(DB_PATH)
+    cur = con.cursor()
+    cur.execute("SELECT id, title, thumbnail, created_at FROM posts ORDER BY created_at DESC LIMIT 20")
+    rows = cur.fetchall()
+    con.close()
+    return jsonify([{"id": r[0], "title": r[1], "thumbnail": r[2], "created_at": r[3][:10]} for r in rows])
+
+@app.route("/api/posts/<int:post_id>")
+def get_post(post_id):
+    con = sqlite3.connect(DB_PATH)
+    cur = con.cursor()
+    cur.execute("SELECT id, title, content, thumbnail, created_at FROM posts WHERE id=?", (post_id,))
+    r = cur.fetchone()
+    con.close()
+    if not r:
+        return jsonify({"error": "not found"}), 404
+    return jsonify({"id": r[0], "title": r[1], "content": r[2], "thumbnail": r[3], "created_at": r[4][:10]})
+
+@app.route("/post/<int:post_id>")
+def post_detail(post_id):
+    return render_template("post_detail.html", post_id=post_id)
+
 @app.route("/api/reviews/<app_id>")
 def get_reviews(app_id):
     con = sqlite3.connect(DB_PATH)
@@ -749,6 +786,35 @@ def admin():
 def admin_logout():
     session.pop("admin", None)
     return redirect("/admin")
+
+@app.route("/admin/post", methods=["POST"])
+def admin_post():
+    if not session.get("admin"):
+        return jsonify({"error": "unauthorized"}), 401
+    data      = request.get_json()
+    title     = (data.get("title") or "").strip()
+    content   = (data.get("content") or "").strip()
+    thumbnail = (data.get("thumbnail") or "").strip()
+    if not title or not content:
+        return jsonify({"error": "제목과 내용을 입력해주세요"}), 400
+    con = sqlite3.connect(DB_PATH)
+    cur = con.cursor()
+    cur.execute("INSERT INTO posts (title, content, thumbnail, created_at) VALUES (?,?,?,?)",
+                (title, content, thumbnail, datetime.now().isoformat()))
+    con.commit()
+    con.close()
+    return jsonify({"ok": True})
+
+@app.route("/admin/post/<int:post_id>/delete", methods=["POST"])
+def admin_delete_post(post_id):
+    if not session.get("admin"):
+        return jsonify({"error": "unauthorized"}), 401
+    con = sqlite3.connect(DB_PATH)
+    cur = con.cursor()
+    cur.execute("DELETE FROM posts WHERE id=?", (post_id,))
+    con.commit()
+    con.close()
+    return jsonify({"ok": True})
 
 @app.route("/admin/add", methods=["POST"])
 def admin_add():

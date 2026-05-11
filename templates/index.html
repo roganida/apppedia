@@ -233,7 +233,7 @@
   <main class="flex-1 min-w-0">
 
     <!-- Tabs -->
-    <div class="tab-wrap p-2 grid grid-cols-3 sm:grid-cols-6 gap-1.5 mb-6">
+    <div class="tab-wrap p-2 grid grid-cols-4 sm:grid-cols-7 gap-1.5 mb-6">
       <button onclick="switchTab('downloads')" id="tab-downloads"
         class="tab-active py-3 px-2 rounded-xl flex flex-col items-center gap-1.5 transition-all">
         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -283,6 +283,21 @@
         </svg>
         <span class="text-xs font-semibold">주간 인기</span>
       </button>
+      <button onclick="switchTab('trends')" id="tab-trends"
+        class="tab-inactive py-3 px-2 rounded-xl flex flex-col items-center gap-1.5 transition-all">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+        </svg>
+        <span class="text-xs font-semibold">트렌드</span>
+      </button>
+    </div>
+
+    <!-- 무료/유료 토글 (다운로드 탭 전용) -->
+    <div id="paid-toggle" class="hidden flex gap-2 mb-4">
+      <button id="btn-free" onclick="setPaid(false)"
+        class="px-4 py-1.5 rounded-xl text-xs font-bold bg-blue-600 text-white transition-all">무료</button>
+      <button id="btn-paid" onclick="setPaid(true)"
+        class="px-4 py-1.5 rounded-xl text-xs font-bold bg-gray-100 text-gray-500 transition-all">유료</button>
     </div>
 
     <!-- Filter bar -->
@@ -337,26 +352,48 @@
       games:      '🎮 인기 게임 — App Store + Google Play',
       votes:      '👍 사용자 투표 Top 50',
       curated:    '⭐ 에디터 픽',
+      trends:     '📈 앱 트렌드',
     };
+
+    let isPaid = false;
 
     function switchTab(tab) {
       currentTab = tab;
-      ['downloads','revenue','new','games','votes','curated'].forEach(t => {
+      isPaid = false;
+      ['downloads','revenue','new','games','votes','curated','trends'].forEach(t => {
         const el = document.getElementById('tab-' + t);
         el.className = el.className.replace(/tab-active|tab-inactive/g, '').trim();
         el.classList.add(t === tab ? 'tab-active' : 'tab-inactive');
       });
-      const hideFilter = tab === 'curated' || tab === 'games' || tab === 'downloads';
+      const hideFilter = tab === 'curated' || tab === 'games' || tab === 'downloads' || tab === 'trends';
       document.getElementById('store-filter').style.display = hideFilter ? 'none' : '';
       document.getElementById('category-filter').style.display = hideFilter ? 'none' : '';
+      document.getElementById('paid-toggle').style.display = tab === 'downloads' ? 'flex' : 'none';
+      setPaid(false, true);
       loadApps();
+    }
+
+    function setPaid(paid, silent = false) {
+      isPaid = paid;
+      document.getElementById('btn-free').className =
+        `px-4 py-1.5 rounded-xl text-xs font-bold transition-all ${!paid ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-500'}`;
+      document.getElementById('btn-paid').className =
+        `px-4 py-1.5 rounded-xl text-xs font-bold transition-all ${paid ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-500'}`;
+      if (!silent) loadApps();
     }
 
     async function loadApps() {
       document.getElementById('tab-label').textContent = tabLabels[currentTab];
       showSkeleton();
       try {
-        const res = await fetch(`/api/rankings?tab=${currentTab}`);
+        if (currentTab === 'trends') {
+          const res = await fetch('/api/posts');
+          const posts = await res.json();
+          renderTrends(posts);
+          return;
+        }
+        const paid = currentTab === 'downloads' && isPaid ? '&paid=true' : '';
+        const res = await fetch(`/api/rankings?tab=${currentTab}${paid}`);
         allApps = await res.json();
         populateCategories();
         applyFilter();
@@ -364,6 +401,29 @@
         document.getElementById('app-list').innerHTML =
           `<div class="text-center text-gray-400 py-16">데이터를 불러오지 못했어요 😢</div>`;
       }
+    }
+
+    function renderTrends(posts) {
+      const el = document.getElementById('app-list');
+      if (!posts.length) {
+        el.innerHTML = `<div class="text-center text-gray-400 py-16">
+          <p class="text-3xl mb-3">📈</p>
+          <p class="font-semibold text-gray-600 mb-1">아직 트렌드 글이 없어요</p>
+          <p class="text-sm">곧 업데이트될 예정이에요!</p>
+        </div>`;
+        return;
+      }
+      el.innerHTML = posts.map(p => `
+        <a href="/post/${p.id}" class="app-card px-5 py-4 flex gap-4 items-center block">
+          ${p.thumbnail
+            ? `<img src="${escHtml(p.thumbnail)}" class="w-16 h-16 rounded-2xl object-cover shrink-0 bg-gray-100"/>`
+            : `<div class="w-16 h-16 rounded-2xl bg-blue-50 flex items-center justify-center text-2xl shrink-0">📈</div>`}
+          <div class="flex-1 min-w-0">
+            <div class="font-bold text-sm text-gray-900 mb-1 line-clamp-2">${escHtml(p.title)}</div>
+            <div class="text-xs text-gray-400">${p.created_at}</div>
+          </div>
+          <span class="text-gray-300 shrink-0">→</span>
+        </a>`).join('');
     }
 
     function populateCategories() {

@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title id="page-title">앱 트렌드 — 앱과사전</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background: #f5f7fa; color: #1a1a2e; }
+    .header-bar { background: rgba(255,255,255,0.9); backdrop-filter: blur(16px); border-bottom: 1px solid #e8eaf0; }
+    .hero-accent { background: linear-gradient(135deg, #00b4d8, #0077b6, #023e8a); }
+    .card { background:#fff; border:1px solid #e8eaf0; border-radius:16px; box-shadow:0 1px 4px rgba(0,0,0,0.05); }
+    .content p { margin-bottom: 1rem; line-height: 1.8; }
+    .content h2 { font-size: 1.1rem; font-weight: 700; margin: 1.5rem 0 0.5rem; }
+    .content h3 { font-size: 1rem; font-weight: 600; margin: 1.25rem 0 0.4rem; }
+  </style>
+</head>
+<body class="min-h-screen font-sans">
+  <header class="header-bar sticky top-0 z-50">
+    <div class="max-w-3xl mx-auto px-4 h-16 flex items-center justify-between">
+      <a href="/" class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl flex items-center justify-center text-xl hero-accent shadow-sm">📱</div>
+        <span class="text-lg font-extrabold tracking-tight text-gray-900">앱과사전</span>
+      </a>
+      <a href="/" class="text-sm text-blue-500 hover:text-blue-700 font-medium">← 순위로 돌아가기</a>
+    </div>
+  </header>
+
+  <main class="max-w-3xl mx-auto px-4 py-8">
+    <div id="skeleton" class="card p-8 space-y-4">
+      <div class="h-6 bg-gray-100 rounded-xl w-3/4 animate-pulse"></div>
+      <div class="h-3 bg-gray-100 rounded w-24 animate-pulse"></div>
+      <div class="space-y-2 pt-4">
+        <div class="h-3 bg-gray-100 rounded animate-pulse"></div>
+        <div class="h-3 bg-gray-100 rounded animate-pulse"></div>
+        <div class="h-3 bg-gray-100 rounded w-2/3 animate-pulse"></div>
+      </div>
+    </div>
+
+    <div id="content" class="hidden">
+      <div class="card p-8">
+        <p id="post-date" class="text-xs text-blue-400 font-semibold mb-3"></p>
+        <h1 id="post-title" class="text-2xl font-extrabold text-gray-900 mb-6"></h1>
+        <img id="post-thumbnail" class="w-full rounded-2xl mb-6 hidden" />
+        <div id="post-content" class="content text-sm text-gray-700 leading-relaxed whitespace-pre-line"></div>
+      </div>
+    </div>
+
+    <div id="error-msg" class="hidden text-center py-20 text-gray-400">
+      글을 불러오지 못했어요 😢<br/>
+      <a href="/" class="text-blue-500 text-sm mt-2 inline-block">← 홈으로</a>
+    </div>
+  </main>
+
+  <script>
+    const postId = {{ post_id }};
+    async function load() {
+      try {
+        const res = await fetch(`/api/posts/${postId}`);
+        if (!res.ok) throw new Error();
+        const d = await res.json();
+        document.getElementById('page-title').textContent = `${d.title} — 앱과사전`;
+        document.getElementById('post-title').textContent = d.title;
+        document.getElementById('post-date').textContent = d.created_at;
+        document.getElementById('post-content').textContent = d.content;
+        if (d.thumbnail) {
+          const img = document.getElementById('post-thumbnail');
+          img.src = d.thumbnail;
+          img.classList.remove('hidden');
+        }
+        document.getElementById('skeleton').classList.add('hidden');
+        document.getElementById('content').classList.remove('hidden');
+      } catch(e) {
+        document.getElementById('skeleton').classList.add('hidden');
+        document.getElementById('error-msg').classList.remove('hidden');
+      }
+    }
+    load();
+  </script>
+</body>
+</html>
