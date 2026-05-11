@@ -233,7 +233,7 @@
   <main class="flex-1 min-w-0">
 
     <!-- Tabs -->
-    <div class="tab-wrap p-2 grid grid-cols-4 sm:grid-cols-8 gap-1.5 mb-6">
+    <div class="tab-wrap p-2 grid grid-cols-3 sm:grid-cols-6 gap-1.5 mb-6">
       <button onclick="switchTab('downloads')" id="tab-downloads"
         class="tab-active py-3 px-2 rounded-xl flex flex-col items-center gap-1.5 transition-all">
         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -254,14 +254,6 @@
           <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
         </svg>
         <span class="text-xs font-semibold">신규 앱</span>
-      </button>
-      <button onclick="switchTab('googleplay')" id="tab-googleplay"
-        class="tab-inactive py-3 px-2 rounded-xl flex flex-col items-center gap-1.5 transition-all">
-        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
-          <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-        </svg>
-        <span class="text-xs font-semibold">Google Play</span>
       </button>
       <button onclick="switchTab('games')" id="tab-games"
         class="tab-inactive py-3 px-2 rounded-xl flex flex-col items-center gap-1.5 transition-all">
@@ -342,7 +334,6 @@
       downloads:  '📥 다운로드 순위 — App Store + Google Play',
       revenue:    '🏆 App Store 베스트셀러 Top 50',
       new:        '🆕 신규 앱 — App Store + Google Play',
-      googleplay: '🤖 Google Play 인기 앱',
       games:      '🎮 인기 게임 — App Store + Google Play',
       votes:      '👍 사용자 투표 Top 50',
       curated:    '⭐ 에디터 픽',
@@ -350,12 +341,12 @@
 
     function switchTab(tab) {
       currentTab = tab;
-      ['downloads','revenue','new','googleplay','games','votes','curated'].forEach(t => {
+      ['downloads','revenue','new','games','votes','curated'].forEach(t => {
         const el = document.getElementById('tab-' + t);
         el.className = el.className.replace(/tab-active|tab-inactive/g, '').trim();
         el.classList.add(t === tab ? 'tab-active' : 'tab-inactive');
       });
-      const hideFilter = tab === 'curated' || tab === 'googleplay' || tab === 'games';
+      const hideFilter = tab === 'curated' || tab === 'games' || tab === 'downloads';
       document.getElementById('store-filter').style.display = hideFilter ? 'none' : '';
       document.getElementById('category-filter').style.display = hideFilter ? 'none' : '';
       loadApps();
@@ -395,15 +386,33 @@
 
     function renderList(apps) {
       const el = document.getElementById('app-list');
-      if (currentTab === 'curated') {
-        renderCurated(apps);
-        return;
-      }
+      if (currentTab === 'curated') { renderCurated(apps); return; }
+      if (currentTab === 'downloads') { renderDownloadsSplit(apps); return; }
       if (!apps.length) {
         el.innerHTML = `<div class="text-center text-gray-400 py-16">앱이 없어요 🫙</div>`;
         return;
       }
       el.innerHTML = apps.map((app, i) => appCard(app, i + 1)).join('');
+    }
+
+    function renderDownloadsSplit(apps) {
+      const el = document.getElementById('app-list');
+      const appstore  = apps.filter(a => a.store === 'appstore');
+      const googleplay = apps.filter(a => a.store === 'googleplay');
+      const col = (list, title, badge) => `
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 mb-3 px-1">
+            <span class="text-xs font-bold px-2 py-1 rounded-lg ${badge}">${title}</span>
+          </div>
+          <div class="space-y-2">
+            ${list.map((app, i) => appCard(app, i + 1)).join('')}
+          </div>
+        </div>`;
+      el.innerHTML = `
+        <div class="flex gap-3 items-start">
+          ${col(appstore,  'App Store',   'store-badge-appstore')}
+          ${col(googleplay,'Google Play', 'store-badge-googleplay')}
+        </div>`;
     }
 
     function renderCurated(collections) {
