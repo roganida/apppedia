@@ -3,3 +3,4 @@ flask-cors
 requests
 gunicorn
 google-play-scraper
+psycopg2-binary

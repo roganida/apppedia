@@ -1,12 +1,14 @@
 from flask import Flask, render_template, jsonify, request, session, redirect, url_for
 from flask_cors import CORS
 import requests
-import sqlite3
+import psycopg2
+import psycopg2.extras
 import os
 import time
 from datetime import datetime
 
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "apppedia2026")
+DATABASE_URL   = os.environ.get("DATABASE_URL")
 
 _cache = {}
 _CACHE_TTL = 3600  # 1시간
@@ -26,7 +28,8 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "apppedia-secret-2026")
 CORS(app)
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "appranking.db")
+def get_db():
+    return psycopg2.connect(DATABASE_URL)
 
 COLLECTIONS = [
     {"id": "weekly",      "emoji": "🔥", "title": "이번 주 추천",    "desc": "에디터가 직접 골랐어요"},
@@ -58,7 +61,7 @@ SAMPLE_CURATED = [
 ]
 
 def init_db():
-    con = sqlite3.connect(DB_PATH)
+    con = get_db()
     cur = con.cursor()
     cur.execute("""
         CREATE TABLE IF NOT EXISTS votes (
@@ -82,14 +85,14 @@ def init_db():
     """)
     cur.execute("""
         CREATE TABLE IF NOT EXISTS rank_history (
-            id       INTEGER PRIMARY KEY AUTOINCREMENT,
-            tab      TEXT,
-            date     TEXT,
-            rank     INTEGER,
-            app_id   TEXT,
-            name     TEXT,
-            icon     TEXT,
-            store    TEXT,
+            id        SERIAL PRIMARY KEY,
+            tab       TEXT,
+            date      TEXT,
+            rank      INTEGER,
+            app_id    TEXT,
+            name      TEXT,
+            icon      TEXT,
+            store     TEXT,
             developer TEXT,
             category  TEXT
         )
@@ -97,7 +100,7 @@ def init_db():
     cur.execute("CREATE INDEX IF NOT EXISTS idx_history_tab_date ON rank_history(tab, date)")
     cur.execute("""
         CREATE TABLE IF NOT EXISTS reviews (
-            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            id         SERIAL PRIMARY KEY,
             app_id     TEXT,
             nickname   TEXT,
             rating     INTEGER,
@@ -108,7 +111,7 @@ def init_db():
     cur.execute("CREATE INDEX IF NOT EXISTS idx_reviews_app_id ON reviews(app_id)")
     cur.execute("""
         CREATE TABLE IF NOT EXISTS posts (
-            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            id         SERIAL PRIMARY KEY,
             title      TEXT,
             content    TEXT,
             thumbnail  TEXT,
@@ -116,7 +119,6 @@ def init_db():
         )
     """)
     con.commit()
-    # 샘플 데이터 없으면 채우기
     cur.execute("SELECT COUNT(*) FROM curated")
     if cur.fetchone()[0] == 0:
         seed_curated(con)
@@ -129,8 +131,9 @@ def seed_curated(con):
         if not info:
             continue
         cur.execute("""
-            INSERT OR IGNORE INTO curated (app_id, collection, name, icon, developer, category, store, url, added_at)
-            VALUES (?,?,?,?,?,?,?,?,?)
+            INSERT INTO curated (app_id, collection, name, icon, developer, category, store, url, added_at)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
+            ON CONFLICT (app_id, collection) DO NOTHING
         """, (item["app_id"], item["collection"], info["name"], info["icon"],
               info["developer"], info["category"], item["store"], info["url"],
               datetime.now().isoformat()))
@@ -157,16 +160,16 @@ init_db()
 
 def save_rank_history(tab, apps):
     today = datetime.now().strftime("%Y-%m-%d")
-    con = sqlite3.connect(DB_PATH)
+    con = get_db()
     cur = con.cursor()
-    cur.execute("SELECT COUNT(*) FROM rank_history WHERE tab=? AND date=?", (tab, today))
+    cur.execute("SELECT COUNT(*) FROM rank_history WHERE tab=%s AND date=%s", (tab, today))
     if cur.fetchone()[0] > 0:
         con.close()
         return
     for a in apps:
         cur.execute("""
             INSERT INTO rank_history (tab, date, rank, app_id, name, icon, store, developer, category)
-            VALUES (?,?,?,?,?,?,?,?,?)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
         """, (tab, today, a["rank"], a["app_id"], a["name"], a["icon"],
               a["store"], a.get("developer",""), a.get("category","")))
     con.commit()
@@ -174,11 +177,11 @@ def save_rank_history(tab, apps):
 
 def get_prev_ranks(tab):
     today = datetime.now().strftime("%Y-%m-%d")
-    con = sqlite3.connect(DB_PATH)
+    con = get_db()
     cur = con.cursor()
     cur.execute("""
         SELECT app_id, rank, date FROM rank_history
-        WHERE tab=? AND date < ? ORDER BY date DESC
+        WHERE tab=%s AND date < %s ORDER BY date DESC
     """, (tab, today))
     rows = cur.fetchall()
     con.close()
@@ -299,7 +302,7 @@ def fetch_googleplay_games(limit=25):
     return apps[:limit]
 
 def fetch_games(limit=50):
-    appstore = fetch_appstore_games(limit // 2)
+    appstore   = fetch_appstore_games(limit // 2)
     googleplay = fetch_googleplay_games(limit // 2)
     return interleave(appstore, googleplay, limit)
 
@@ -371,16 +374,16 @@ def fetch_googleplay_popular(limit=50):
 def get_votes(app_ids):
     if not app_ids:
         return {}
-    con = sqlite3.connect(DB_PATH)
+    con = get_db()
     cur = con.cursor()
-    placeholders = ",".join("?" * len(app_ids))
+    placeholders = ",".join(["%s"] * len(app_ids))
     cur.execute(f"SELECT app_id, vote_count FROM votes WHERE app_id IN ({placeholders})", app_ids)
     result = {row[0]: row[1] for row in cur.fetchall()}
     con.close()
     return result
 
 def get_curated():
-    con = sqlite3.connect(DB_PATH)
+    con = get_db()
     cur = con.cursor()
     cur.execute("""
         SELECT app_id, collection, name, icon, developer, category, store, url
@@ -421,9 +424,7 @@ def index():
 
 @app.route("/api/rankings")
 def rankings():
-    tab = request.args.get("tab", "downloads")
-
-    # 캐시에서 바로 반환 (votes·curated 제외 — 실시간성 필요)
+    tab  = request.args.get("tab", "downloads")
     paid = request.args.get("paid") == "true"
     cache_key = f"rankings_{tab}_{'paid' if paid else 'free'}"
     if tab not in ("votes", "curated"):
@@ -432,15 +433,14 @@ def rankings():
             return jsonify(cached)
 
     if tab == "downloads":
-        paid = request.args.get("paid") == "true"
-        feed = "toppaidapplications" if paid else "topfreeapplications"
+        feed      = "toppaidapplications" if paid else "topfreeapplications"
         appstore  = fetch_apple_rss(feed, 25)
         googleplay = fetch_googleplay_popular(25)
         apps = interleave(appstore, googleplay, 50)
     elif tab == "revenue":
         apps = fetch_apple_rss("topgrossingapplications", 50)
     elif tab == "new":
-        appstore = fetch_apple_rss("newfreeapplications", 25)
+        appstore   = fetch_apple_rss("newfreeapplications", 25)
         googleplay = fetch_googleplay_new(25)
         apps = interleave(appstore, googleplay, 50)
     elif tab == "googleplay":
@@ -449,8 +449,8 @@ def rankings():
         apps = fetch_games(50)
     elif tab == "votes":
         appstore = fetch_apple_rss("topfreeapplications", 50)
-        gplay = fetch_googleplay_popular(30)
-        apps = appstore + gplay
+        gplay    = fetch_googleplay_popular(30)
+        apps     = appstore + gplay
         attach_votes(apps)
         apps.sort(key=lambda x: x["votes"], reverse=True)
         return jsonify(apps[:50])
@@ -471,33 +471,37 @@ def ping():
 
 @app.route("/api/vote", methods=["POST"])
 def vote():
-    data = request.get_json()
+    data   = request.get_json()
     app_id = data.get("app_id")
     if not app_id:
         return jsonify({"error": "app_id required"}), 400
-    con = sqlite3.connect(DB_PATH)
+    con = get_db()
     cur = con.cursor()
     cur.execute("""
-        INSERT INTO votes (app_id, vote_count) VALUES (?, 1)
-        ON CONFLICT(app_id) DO UPDATE SET vote_count = vote_count + 1
+        INSERT INTO votes (app_id, vote_count) VALUES (%s, 1)
+        ON CONFLICT(app_id) DO UPDATE SET vote_count = votes.vote_count + 1
     """, (app_id,))
     con.commit()
-    cur.execute("SELECT vote_count FROM votes WHERE app_id = ?", (app_id,))
+    cur.execute("SELECT vote_count FROM votes WHERE app_id = %s", (app_id,))
     count = cur.fetchone()[0]
     con.close()
     return jsonify({"app_id": app_id, "vote_count": count})
 
 @app.route("/api/curate", methods=["POST"])
 def curate():
-    data = request.get_json()
+    data     = request.get_json()
     required = ["app_id", "name", "icon", "developer", "store", "url"]
     if not all(data.get(k) for k in required):
         return jsonify({"error": "missing fields"}), 400
-    con = sqlite3.connect(DB_PATH)
+    con = get_db()
     cur = con.cursor()
     cur.execute("""
-        INSERT OR REPLACE INTO curated (app_id, name, icon, developer, category, store, url, added_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO curated (app_id, name, icon, developer, category, store, url, added_at)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        ON CONFLICT (app_id, collection) DO UPDATE SET
+            name=EXCLUDED.name, icon=EXCLUDED.icon, developer=EXCLUDED.developer,
+            category=EXCLUDED.category, store=EXCLUDED.store, url=EXCLUDED.url,
+            added_at=EXCLUDED.added_at
     """, (data["app_id"], data["name"], data["icon"], data.get("developer",""),
           data.get("category",""), data["store"], data["url"],
           datetime.now().isoformat()))
@@ -511,7 +515,6 @@ def search_apps():
     if not q:
         return jsonify([])
     results = []
-    # App Store 검색
     try:
         r = requests.get(
             "https://itunes.apple.com/search",
@@ -531,7 +534,6 @@ def search_apps():
             })
     except Exception as ex:
         print(f"AppStore search error: {ex}")
-    # Google Play 검색
     try:
         from google_play_scraper import search as gp_search
         gp_results = gp_search(q, lang="ko", country="kr", n_hits=10)
@@ -556,27 +558,27 @@ def search_apps():
 def history():
     tab  = request.args.get("tab", "downloads")
     date = request.args.get("date", "")
-    con  = sqlite3.connect(DB_PATH)
+    con  = get_db()
     cur  = con.cursor()
     if date:
         cur.execute("""
             SELECT rank, app_id, name, icon, store, developer, category
-            FROM rank_history WHERE tab=? AND date=? ORDER BY rank
+            FROM rank_history WHERE tab=%s AND date=%s ORDER BY rank
         """, (tab, date))
+        rows = cur.fetchall()
+        con.close()
+        return jsonify([{
+            "rank": r[0], "app_id": r[1], "name": r[2],
+            "icon": r[3], "store": r[4], "developer": r[5], "category": r[6]
+        } for r in rows])
     else:
         cur.execute("""
             SELECT DISTINCT date FROM rank_history
-            WHERE tab=? ORDER BY date DESC LIMIT 90
+            WHERE tab=%s ORDER BY date DESC LIMIT 90
         """, (tab,))
         dates = [r[0] for r in cur.fetchall()]
         con.close()
         return jsonify(dates)
-    rows = cur.fetchall()
-    con.close()
-    return jsonify([{
-        "rank": r[0], "app_id": r[1], "name": r[2],
-        "icon": r[3], "store": r[4], "developer": r[5], "category": r[6]
-    } for r in rows])
 
 @app.route("/weekly")
 def weekly():
@@ -584,13 +586,8 @@ def weekly():
 
 @app.route("/api/weekly")
 def api_weekly():
-    from datetime import datetime, timedelta
-    # 이번 주 월요일 ~ 오늘
-    today = datetime.now()
-    week_start = (today - timedelta(days=today.weekday())).strftime("%Y-%m-%d")
-    con = sqlite3.connect(DB_PATH)
+    con = get_db()
     cur = con.cursor()
-    # 이번 주 누적 투표 TOP 10
     cur.execute("""
         SELECT v.app_id, v.vote_count
         FROM votes v ORDER BY v.vote_count DESC LIMIT 10
@@ -598,10 +595,8 @@ def api_weekly():
     rows = cur.fetchall()
     con.close()
     if not rows:
-        # 투표 데이터 없으면 다운로드 순위로 대체
         apps = fetch_apple_rss("topfreeapplications", 10)
         return jsonify(attach_votes(apps))
-    # app_id로 앱 정보 조회
     result = []
     for rank, (app_id, vote_count) in enumerate(rows, 1):
         if app_id.startswith("gp_"):
@@ -610,17 +605,17 @@ def api_weekly():
         else:
             info = fetch_itunes_info(app_id) or {}
             info["store"] = "appstore"
-            info["url"] = info.get("url", "")
+            info["url"]   = info.get("url", "")
         result.append({
-            "rank":       rank,
-            "app_id":     app_id,
-            "name":       info.get("name", ""),
-            "icon":       info.get("icon", ""),
-            "developer":  info.get("developer", ""),
-            "category":   info.get("category", ""),
-            "store":      info.get("store", "appstore"),
-            "url":        info.get("url", ""),
-            "votes":      vote_count,
+            "rank":      rank,
+            "app_id":    app_id,
+            "name":      info.get("name", ""),
+            "icon":      info.get("icon", ""),
+            "developer": info.get("developer", ""),
+            "category":  info.get("category", ""),
+            "store":     info.get("store", "appstore"),
+            "url":       info.get("url", ""),
+            "votes":     vote_count,
         })
     return jsonify(result)
 
@@ -671,19 +666,19 @@ def api_app_detail(app_id):
             from google_play_scraper import app as gp_app
             d = gp_app(gp_id, lang="ko", country="kr")
             return jsonify({
-                "app_id":      app_id,
-                "name":        d.get("title", ""),
-                "icon":        d.get("icon", ""),
-                "developer":   d.get("developer", ""),
-                "category":    d.get("genre", ""),
-                "rating":      round(d.get("score") or 0, 1),
-                "rating_count":d.get("ratings", 0),
-                "description": d.get("description", ""),
-                "screenshots": d.get("screenshots", [])[:5],
-                "version":     d.get("version", ""),
-                "updated":     d.get("updated", ""),
-                "store":       "googleplay",
-                "url":         f"https://play.google.com/store/apps/details?id={gp_id}",
+                "app_id":       app_id,
+                "name":         d.get("title", ""),
+                "icon":         d.get("icon", ""),
+                "developer":    d.get("developer", ""),
+                "category":     d.get("genre", ""),
+                "rating":       round(d.get("score") or 0, 1),
+                "rating_count": d.get("ratings", 0),
+                "description":  d.get("description", ""),
+                "screenshots":  d.get("screenshots", [])[:5],
+                "version":      d.get("version", ""),
+                "updated":      d.get("updated", ""),
+                "store":        "googleplay",
+                "url":          f"https://play.google.com/store/apps/details?id={gp_id}",
             })
         except Exception as ex:
             return jsonify({"error": str(ex)}), 404
@@ -695,27 +690,27 @@ def api_app_detail(app_id):
                 return jsonify({"error": "not found"}), 404
             d = results[0]
             return jsonify({
-                "app_id":      app_id,
-                "name":        d.get("trackName", ""),
-                "icon":        d.get("artworkUrl512") or d.get("artworkUrl100", ""),
-                "developer":   d.get("artistName", ""),
-                "category":    d.get("primaryGenreName", ""),
-                "rating":      round(d.get("averageUserRating") or 0, 1),
-                "rating_count":d.get("userRatingCount", 0),
-                "description": d.get("description", ""),
-                "screenshots": d.get("screenshotUrls", [])[:5],
-                "version":     d.get("version", ""),
-                "updated":     d.get("currentVersionReleaseDate", "")[:10],
-                "store":       "appstore",
-                "url":         d.get("trackViewUrl", ""),
-                "price":       d.get("formattedPrice", "무료"),
+                "app_id":       app_id,
+                "name":         d.get("trackName", ""),
+                "icon":         d.get("artworkUrl512") or d.get("artworkUrl100", ""),
+                "developer":    d.get("artistName", ""),
+                "category":     d.get("primaryGenreName", ""),
+                "rating":       round(d.get("averageUserRating") or 0, 1),
+                "rating_count": d.get("userRatingCount", 0),
+                "description":  d.get("description", ""),
+                "screenshots":  d.get("screenshotUrls", [])[:5],
+                "version":      d.get("version", ""),
+                "updated":      d.get("currentVersionReleaseDate", "")[:10],
+                "store":        "appstore",
+                "url":          d.get("trackViewUrl", ""),
+                "price":        d.get("formattedPrice", "무료"),
             })
         except Exception as ex:
             return jsonify({"error": str(ex)}), 404
 
 @app.route("/api/posts")
 def get_posts():
-    con = sqlite3.connect(DB_PATH)
+    con = get_db()
     cur = con.cursor()
     cur.execute("SELECT id, title, thumbnail, created_at FROM posts ORDER BY created_at DESC LIMIT 20")
     rows = cur.fetchall()
@@ -724,9 +719,9 @@ def get_posts():
 
 @app.route("/api/posts/<int:post_id>")
 def get_post(post_id):
-    con = sqlite3.connect(DB_PATH)
+    con = get_db()
     cur = con.cursor()
-    cur.execute("SELECT id, title, content, thumbnail, created_at FROM posts WHERE id=?", (post_id,))
+    cur.execute("SELECT id, title, content, thumbnail, created_at FROM posts WHERE id=%s", (post_id,))
     r = cur.fetchone()
     con.close()
     if not r:
@@ -739,11 +734,11 @@ def post_detail(post_id):
 
 @app.route("/api/reviews/<app_id>")
 def get_reviews(app_id):
-    con = sqlite3.connect(DB_PATH)
+    con = get_db()
     cur = con.cursor()
     cur.execute("""
         SELECT id, nickname, rating, comment, created_at
-        FROM reviews WHERE app_id=? ORDER BY created_at DESC LIMIT 50
+        FROM reviews WHERE app_id=%s ORDER BY created_at DESC LIMIT 50
     """, (app_id,))
     rows = cur.fetchall()
     con.close()
@@ -760,11 +755,11 @@ def post_review(app_id):
     comment  = (data.get("comment") or "").strip()[:200]
     if not nickname or not comment or not (1 <= rating <= 5):
         return jsonify({"error": "입력값을 확인해주세요"}), 400
-    con = sqlite3.connect(DB_PATH)
+    con = get_db()
     cur = con.cursor()
     cur.execute("""
         INSERT INTO reviews (app_id, nickname, rating, comment, created_at)
-        VALUES (?,?,?,?,?)
+        VALUES (%s,%s,%s,%s,%s)
     """, (app_id, nickname, rating, comment, datetime.now().isoformat()))
     con.commit()
     con.close()
@@ -797,9 +792,9 @@ def admin_post():
     thumbnail = (data.get("thumbnail") or "").strip()
     if not title or not content:
         return jsonify({"error": "제목과 내용을 입력해주세요"}), 400
-    con = sqlite3.connect(DB_PATH)
+    con = get_db()
     cur = con.cursor()
-    cur.execute("INSERT INTO posts (title, content, thumbnail, created_at) VALUES (?,?,?,?)",
+    cur.execute("INSERT INTO posts (title, content, thumbnail, created_at) VALUES (%s,%s,%s,%s)",
                 (title, content, thumbnail, datetime.now().isoformat()))
     con.commit()
     con.close()
@@ -809,9 +804,9 @@ def admin_post():
 def admin_delete_post(post_id):
     if not session.get("admin"):
         return jsonify({"error": "unauthorized"}), 401
-    con = sqlite3.connect(DB_PATH)
+    con = get_db()
     cur = con.cursor()
-    cur.execute("DELETE FROM posts WHERE id=?", (post_id,))
+    cur.execute("DELETE FROM posts WHERE id=%s", (post_id,))
     con.commit()
     con.close()
     return jsonify({"ok": True})
@@ -820,33 +815,36 @@ def admin_delete_post(post_id):
 def admin_add():
     if not session.get("admin"):
         return jsonify({"error": "unauthorized"}), 401
-    data = request.get_json()
+    data       = request.get_json()
     app_id     = data.get("app_id", "").strip()
     collection = data.get("collection", "").strip()
     store      = data.get("store", "appstore")
     if not app_id or not collection:
         return jsonify({"error": "missing fields"}), 400
-    # 앱 정보 가져오기
     if store == "appstore":
         info = fetch_itunes_info(app_id)
     else:
         try:
             from google_play_scraper import app as gp_app
-            gp_id = app_id[3:] if app_id.startswith("gp_") else app_id
+            gp_id  = app_id[3:] if app_id.startswith("gp_") else app_id
             app_id = "gp_" + gp_id
-            d = gp_app(gp_id, lang="ko", country="kr")
-            info = {"name": d.get("title",""), "icon": d.get("icon",""),
-                    "developer": d.get("developer",""), "category": d.get("genre",""),
-                    "url": f"https://play.google.com/store/apps/details?id={gp_id}"}
+            d      = gp_app(gp_id, lang="ko", country="kr")
+            info   = {"name": d.get("title",""), "icon": d.get("icon",""),
+                      "developer": d.get("developer",""), "category": d.get("genre",""),
+                      "url": f"https://play.google.com/store/apps/details?id={gp_id}"}
         except:
             info = None
     if not info:
         return jsonify({"error": "앱 정보를 찾지 못했어요"}), 404
-    con = sqlite3.connect(DB_PATH)
+    con = get_db()
     cur = con.cursor()
     cur.execute("""
-        INSERT OR REPLACE INTO curated (app_id, collection, name, icon, developer, category, store, url, added_at)
-        VALUES (?,?,?,?,?,?,?,?,?)
+        INSERT INTO curated (app_id, collection, name, icon, developer, category, store, url, added_at)
+        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
+        ON CONFLICT (app_id, collection) DO UPDATE SET
+            name=EXCLUDED.name, icon=EXCLUDED.icon, developer=EXCLUDED.developer,
+            category=EXCLUDED.category, store=EXCLUDED.store, url=EXCLUDED.url,
+            added_at=EXCLUDED.added_at
     """, (app_id, collection, info["name"], info["icon"], info["developer"],
           info["category"], store, info["url"], datetime.now().isoformat()))
     con.commit()
@@ -857,12 +855,12 @@ def admin_add():
 def admin_delete():
     if not session.get("admin"):
         return jsonify({"error": "unauthorized"}), 401
-    data = request.get_json()
+    data       = request.get_json()
     app_id     = data.get("app_id")
     collection = data.get("collection")
-    con = sqlite3.connect(DB_PATH)
+    con = get_db()
     cur = con.cursor()
-    cur.execute("DELETE FROM curated WHERE app_id=? AND collection=?", (app_id, collection))
+    cur.execute("DELETE FROM curated WHERE app_id=%s AND collection=%s", (app_id, collection))
     con.commit()
     con.close()
     return jsonify({"ok": True})
