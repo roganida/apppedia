@@ -29,7 +29,10 @@ app.secret_key = os.environ.get("SECRET_KEY", "apppedia-secret-2026")
 CORS(app)
 
 def get_db():
-    return psycopg2.connect(DATABASE_URL)
+    url = DATABASE_URL
+    if url and "sslmode" not in url:
+        url += "?sslmode=require"
+    return psycopg2.connect(url)
 
 COLLECTIONS = [
     {"id": "weekly",      "emoji": "🔥", "title": "이번 주 추천",    "desc": "에디터가 직접 골랐어요"},
