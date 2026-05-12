@@ -468,6 +468,36 @@ def rankings():
     cache_set(cache_key, result)
     return jsonify(result)
 
+@app.route("/api/sparklines")
+def sparklines():
+    from datetime import timedelta
+    tab        = request.args.get("tab", "downloads")
+    app_ids    = [a.strip() for a in request.args.get("app_ids", "").split(",") if a.strip()]
+    if not app_ids:
+        return jsonify({})
+    today = datetime.now()
+    dates = [(today - timedelta(days=i)).strftime("%Y-%m-%d") for i in range(6, -1, -1)]
+    try:
+        con = get_db()
+        cur = con.cursor()
+        placeholders = ",".join(["%s"] * len(app_ids))
+        cur.execute(f"""
+            SELECT app_id, date, rank FROM rank_history
+            WHERE tab=%s AND app_id IN ({placeholders}) AND date >= %s
+            ORDER BY date ASC
+        """, [tab] + app_ids + [dates[0]])
+        rows = cur.fetchall()
+        con.close()
+    except:
+        return jsonify({})
+    hist = {}
+    for app_id, date, rank in rows:
+        if app_id not in hist:
+            hist[app_id] = {}
+        hist[app_id][date] = rank
+    result = {app_id: [hist.get(app_id, {}).get(d) for d in dates] for app_id in app_ids}
+    return jsonify(result)
+
 @app.route("/ping")
 def ping():
     return jsonify({"status": "ok", "time": datetime.now().isoformat()})

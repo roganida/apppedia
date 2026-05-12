@@ -444,6 +444,39 @@
       renderList(apps);
     }
 
+    function sparklineSVG(ranks) {
+      const w = 44, h = 20, pad = 2;
+      const valid = ranks.filter(r => r !== null && r !== undefined);
+      if (valid.length < 2) return '<div class="w-11 h-5"></div>';
+      const min = Math.min(...valid), max = Math.max(...valid);
+      const range = max - min || 1;
+      const pts = ranks.map((r, i) => {
+        if (r === null || r === undefined) return null;
+        const x = pad + (i / (ranks.length - 1)) * (w - pad * 2);
+        const y = h - pad - ((max - r) / range) * (h - pad * 2);
+        return `${x.toFixed(1)},${y.toFixed(1)}`;
+      }).filter(Boolean);
+      if (pts.length < 2) return '<div class="w-11 h-5"></div>';
+      const first = valid[0], last = valid[valid.length - 1];
+      const color = last < first ? '#22c55e' : last > first ? '#ef4444' : '#94a3b8';
+      return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
+        <polyline points="${pts.join(' ')}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>`;
+    }
+
+    async function loadSparklines(tab, apps) {
+      if (!apps || !apps.length) return;
+      const ids = apps.map(a => a.app_id).join(',');
+      try {
+        const res = await fetch(`/api/sparklines?tab=${tab}&app_ids=${encodeURIComponent(ids)}`);
+        const data = await res.json();
+        Object.entries(data).forEach(([appId, ranks]) => {
+          const el = document.querySelector(`[data-spark="${appId}"]`);
+          if (el) el.innerHTML = sparklineSVG(ranks);
+        });
+      } catch(e) {}
+    }
+
     function renderList(apps) {
       const el = document.getElementById('app-list');
       if (currentTab === 'curated') { renderCurated(apps); return; }
@@ -453,6 +486,7 @@
         return;
       }
       el.innerHTML = apps.map((app, i) => appCard(app, i + 1)).join('');
+      loadSparklines(currentTab, apps);
     }
 
     function renderDownloadsSplit(apps) {
@@ -473,6 +507,7 @@
           ${col(appstore,  'App Store',   'store-badge-appstore')}
           ${col(googleplay,'Google Play', 'store-badge-googleplay')}
         </div>`;
+      loadSparklines(currentTab, apps);
     }
 
     function renderCurated(collections) {
@@ -541,6 +576,9 @@
             <div class="text-xs text-gray-400 truncate mt-0.5">${escHtml(app.developer || '')} · ${escHtml(app.category || '')}</div>
           </div>
           </a>
+          <div class="hidden sm:flex items-center shrink-0 mr-1" data-spark="${escHtml(app.app_id)}">
+            <div class="w-11 h-5 bg-gray-50 rounded animate-pulse"></div>
+          </div>
           <div class="flex items-center gap-3 shrink-0">
             <div class="text-center hidden sm:block">
               <div class="text-xs font-bold vote-count">${app.votes || 0}</div>
