@@ -870,14 +870,27 @@ def admin_delete():
 
 @app.route("/sitemap.xml")
 def sitemap():
-    xml = '''<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url>
-    <loc>https://www.apppedia.co.kr/</loc>
-    <changefreq>hourly</changefreq>
-    <priority>1.0</priority>
-  </url>
-</urlset>'''
+    urls = ['  <url>\n    <loc>https://www.apppedia.co.kr/</loc>\n    <changefreq>hourly</changefreq>\n    <priority>1.0</priority>\n  </url>']
+
+    # 에디터픽 앱 페이지
+    try:
+        con = get_db()
+        cur = con.cursor()
+        cur.execute("SELECT DISTINCT app_id FROM curated")
+        for (app_id,) in cur.fetchall():
+            urls.append(f'  <url>\n    <loc>https://www.apppedia.co.kr/app/{app_id}</loc>\n    <changefreq>daily</changefreq>\n    <priority>0.8</priority>\n  </url>')
+
+        # 트렌드 글 페이지
+        cur.execute("SELECT id FROM posts ORDER BY created_at DESC")
+        for (post_id,) in cur.fetchall():
+            urls.append(f'  <url>\n    <loc>https://www.apppedia.co.kr/post/{post_id}</loc>\n    <changefreq>weekly</changefreq>\n    <priority>0.7</priority>\n  </url>')
+        con.close()
+    except:
+        pass
+
+    xml = '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+    xml += '\n'.join(urls)
+    xml += '\n</urlset>'
     return app.response_class(xml, mimetype="application/xml")
 
 @app.route("/robots.txt")
