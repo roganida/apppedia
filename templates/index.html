@@ -301,17 +301,26 @@
     </div>
 
     <!-- Filter bar -->
-    <div class="flex items-center justify-between mb-4">
-      <div id="tab-label" class="text-sm font-medium text-gray-500"></div>
-      <div class="flex items-center gap-2">
-        <select id="store-filter" onchange="applyFilter()" class="filter-select">
-          <option value="all">전체 스토어</option>
-          <option value="appstore">App Store</option>
-          <option value="googleplay">Google Play</option>
-        </select>
-        <select id="category-filter" onchange="applyFilter()" class="filter-select">
-          <option value="all">전체 카테고리</option>
-        </select>
+    <div id="filter-bar" class="app-card px-4 py-3 mb-4">
+      <div class="flex items-center justify-between flex-wrap gap-2">
+        <div class="flex items-center gap-2">
+          <span id="tab-label" class="text-sm font-bold text-gray-700"></span>
+          <span id="result-count" class="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full hidden"></span>
+        </div>
+        <div class="flex items-center gap-2 flex-wrap">
+          <select id="store-filter" onchange="applyFilter()" class="filter-select">
+            <option value="all">전체 스토어</option>
+            <option value="appstore">App Store</option>
+            <option value="googleplay">Google Play</option>
+          </select>
+          <select id="category-filter" onchange="applyFilter()" class="filter-select">
+            <option value="all">전체 카테고리</option>
+          </select>
+          <button id="filter-reset" onclick="resetFilter()"
+            class="hidden text-xs text-blue-500 hover:text-blue-700 font-semibold px-2 py-1 rounded-lg hover:bg-blue-50 transition-all">
+            ✕ 초기화
+          </button>
+        </div>
       </div>
     </div>
 
@@ -365,9 +374,12 @@
         el.className = el.className.replace(/tab-active|tab-inactive/g, '').trim();
         el.classList.add(t === tab ? 'tab-active' : 'tab-inactive');
       });
-      const hideFilter = tab === 'curated' || tab === 'games' || tab === 'downloads' || tab === 'trends';
+      const hideFilter = tab === 'curated' || tab === 'downloads' || tab === 'trends';
+      document.getElementById('filter-bar').style.display = hideFilter ? 'none' : '';
       document.getElementById('store-filter').style.display = hideFilter ? 'none' : '';
       document.getElementById('category-filter').style.display = hideFilter ? 'none' : '';
+      document.getElementById('filter-reset').classList.add('hidden');
+      document.getElementById('result-count').classList.add('hidden');
       document.getElementById('paid-toggle').style.display = tab === 'downloads' ? 'flex' : 'none';
       setPaid(false, true);
       loadApps();
@@ -441,7 +453,20 @@
       let apps = allApps;
       if (store !== 'all') apps = apps.filter(a => a.store === store);
       if (cat   !== 'all') apps = apps.filter(a => a.category === cat);
+
+      const isFiltered = store !== 'all' || cat !== 'all';
+      document.getElementById('filter-reset').classList.toggle('hidden', !isFiltered);
+      const countEl = document.getElementById('result-count');
+      countEl.textContent = `${apps.length}개`;
+      countEl.classList.remove('hidden');
+
       renderList(apps);
+    }
+
+    function resetFilter() {
+      document.getElementById('store-filter').value = 'all';
+      document.getElementById('category-filter').value = 'all';
+      applyFilter();
     }
 
     function sparklineSVG(ranks) {
