@@ -426,47 +426,77 @@
         return;
       }
 
-      const isNew = d => {
-        const diff = (new Date() - new Date(d)) / (1000 * 60 * 60 * 24);
-        return diff <= 3;
-      };
+      const isNew = d => (new Date() - new Date(d)) / 86400000 <= 3;
 
-      // 첫 번째 글: 히어로 카드
+      const authorBadge = `
+        <div class="flex items-center gap-1.5">
+          <div class="w-5 h-5 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center text-[10px] text-white font-bold shrink-0">앱</div>
+          <span class="text-xs text-gray-500 font-medium">앱과사전 팀</span>
+        </div>`;
+
       const hero = posts[0];
       const heroHtml = `
-        <a href="/post/${hero.id}" class="app-card block overflow-hidden mb-3 group">
+        <a href="/post/${hero.id}" class="app-card block overflow-hidden mb-4 group">
           ${hero.thumbnail
-            ? `<div class="relative">
-                <img src="${escHtml(hero.thumbnail)}" class="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"/>
-                <div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent rounded-t-2xl"></div>
-                ${isNew(hero.created_at) ? `<span class="absolute top-3 left-3 bg-blue-500 text-white text-[10px] font-bold px-2 py-1 rounded-lg">NEW</span>` : ''}
+            ? `<div class="relative overflow-hidden rounded-t-2xl">
+                <img src="${escHtml(hero.thumbnail)}" class="w-full h-52 object-cover group-hover:scale-105 transition-transform duration-500"/>
+                <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent"></div>
+                <div class="absolute bottom-4 left-4 right-4">
+                  ${isNew(hero.created_at) ? `<span class="inline-block bg-blue-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-md mb-2">NEW</span>` : ''}
+                  <div class="font-extrabold text-white text-base line-clamp-2 drop-shadow">${escHtml(hero.title)}</div>
+                </div>
               </div>
-              <div class="px-5 py-4">
-                <div class="font-extrabold text-base text-gray-900 mb-1 line-clamp-2 group-hover:text-blue-600 transition-colors">${escHtml(hero.title)}</div>
-                <div class="text-xs text-gray-400">📰 앱과사전 · ${hero.created_at}</div>
+              <div class="px-5 py-3 flex items-center justify-between">
+                ${authorBadge}
+                <div class="flex items-center gap-3 text-xs text-gray-400">
+                  <span>${hero.created_at}</span>
+                  <span>· ${hero.read_min || 3}분 읽기</span>
+                </div>
               </div>`
-            : `<div class="px-5 py-6 bg-gradient-to-br from-blue-50 to-indigo-50">
-                ${isNew(hero.created_at) ? `<span class="inline-block bg-blue-500 text-white text-[10px] font-bold px-2 py-1 rounded-lg mb-3">NEW</span>` : ''}
-                <div class="font-extrabold text-lg text-gray-900 mb-2 group-hover:text-blue-600 transition-colors">${escHtml(hero.title)}</div>
-                <div class="text-xs text-gray-400">📰 앱과사전 · ${hero.created_at}</div>
+            : `<div class="px-5 py-7 bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 rounded-t-2xl">
+                ${isNew(hero.created_at) ? `<span class="inline-block bg-blue-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-md mb-3">NEW</span>` : ''}
+                <div class="font-extrabold text-xl text-gray-900 mb-3 group-hover:text-blue-600 transition-colors line-clamp-3">${escHtml(hero.title)}</div>
+                ${hero.excerpt ? `<p class="text-sm text-gray-500 line-clamp-2 mb-3">${escHtml(hero.excerpt)}</p>` : ''}
+              </div>
+              <div class="px-5 py-3 flex items-center justify-between border-t border-gray-100">
+                ${authorBadge}
+                <div class="flex items-center gap-3 text-xs text-gray-400">
+                  <span>${hero.created_at}</span>
+                  <span>· ${hero.read_min || 3}분 읽기</span>
+                </div>
               </div>`}
         </a>`;
 
-      // 나머지 글: 가로 카드
-      const restHtml = posts.slice(1).map(p => `
-        <a href="/post/${p.id}" class="app-card px-4 py-4 flex gap-4 items-center block group mb-2">
-          ${p.thumbnail
-            ? `<img src="${escHtml(p.thumbnail)}" class="w-20 h-20 rounded-2xl object-cover shrink-0 bg-gray-100 group-hover:opacity-90 transition-opacity"/>`
-            : `<div class="w-20 h-20 rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center text-3xl shrink-0">📰</div>`}
-          <div class="flex-1 min-w-0">
-            ${isNew(p.created_at) ? `<span class="inline-block bg-blue-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded mb-1">NEW</span>` : ''}
-            <div class="font-bold text-sm text-gray-900 line-clamp-2 group-hover:text-blue-600 transition-colors mb-1.5">${escHtml(p.title)}</div>
-            <div class="text-xs text-gray-400">${p.created_at}</div>
-          </div>
-          <span class="text-gray-300 group-hover:text-blue-400 transition-colors shrink-0 text-lg">→</span>
-        </a>`).join('');
+      const restHtml = posts.slice(1).length ? `
+        <div class="space-y-3">
+          ${posts.slice(1).map(p => `
+            <a href="/post/${p.id}" class="app-card flex gap-4 p-4 block group">
+              ${p.thumbnail
+                ? `<img src="${escHtml(p.thumbnail)}" class="w-24 h-24 rounded-2xl object-cover shrink-0 group-hover:opacity-90 transition-opacity"/>`
+                : `<div class="w-24 h-24 rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center text-3xl shrink-0">📰</div>`}
+              <div class="flex-1 min-w-0 flex flex-col justify-between py-0.5">
+                <div>
+                  ${isNew(p.created_at) ? `<span class="inline-block bg-blue-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded mb-1.5">NEW</span>` : ''}
+                  <div class="font-bold text-sm text-gray-900 line-clamp-2 group-hover:text-blue-600 transition-colors mb-1">${escHtml(p.title)}</div>
+                  ${p.excerpt ? `<p class="text-xs text-gray-400 line-clamp-1">${escHtml(p.excerpt)}</p>` : ''}
+                </div>
+                <div class="flex items-center justify-between mt-2">
+                  ${authorBadge}
+                  <span class="text-xs text-gray-400">${p.created_at} · ${p.read_min || 3}분</span>
+                </div>
+              </div>
+            </a>`).join('')}
+        </div>` : '';
 
-      el.innerHTML = heroHtml + restHtml;
+      el.innerHTML = `
+        <div class="mb-4 px-1 flex items-center justify-between">
+          <div>
+            <div class="font-extrabold text-gray-900 text-base">앱 뉴스</div>
+            <div class="text-xs text-gray-400 mt-0.5">앱과사전 팀이 직접 쓰는 앱 이야기</div>
+          </div>
+          <span class="text-xs text-gray-400">${posts.length}개의 글</span>
+        </div>
+        ${heroHtml}${restHtml}`;
     }
 
     function populateCategories() {

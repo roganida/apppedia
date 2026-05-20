@@ -745,10 +745,19 @@ def api_app_detail(app_id):
 def get_posts():
     con = get_db()
     cur = con.cursor()
-    cur.execute("SELECT id, title, thumbnail, created_at FROM posts ORDER BY created_at DESC LIMIT 20")
+    cur.execute("SELECT id, title, thumbnail, created_at, content FROM posts ORDER BY created_at DESC LIMIT 20")
     rows = cur.fetchall()
     con.close()
-    return jsonify([{"id": r[0], "title": r[1], "thumbnail": r[2], "created_at": r[3][:10]} for r in rows])
+    result = []
+    for r in rows:
+        content = r[4] or ""
+        read_min = max(1, round(len(content) / 300))
+        result.append({
+            "id": r[0], "title": r[1], "thumbnail": r[2],
+            "created_at": r[3][:10], "read_min": read_min,
+            "excerpt": content[:80] + "..." if len(content) > 80 else content
+        })
+    return jsonify(result)
 
 @app.route("/api/posts/<int:post_id>")
 def get_post(post_id):
