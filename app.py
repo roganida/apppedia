@@ -842,6 +842,24 @@ def admin_post():
     con.close()
     return jsonify({"ok": True})
 
+@app.route("/admin/post/<int:post_id>/edit", methods=["POST"])
+def admin_edit_post(post_id):
+    if not session.get("admin"):
+        return jsonify({"error": "unauthorized"}), 401
+    data      = request.get_json()
+    title     = data.get("title", "").strip()
+    content   = data.get("content", "").strip()
+    thumbnail = data.get("thumbnail", "").strip()
+    if not title or not content:
+        return jsonify({"error": "missing fields"}), 400
+    con = get_db()
+    cur = con.cursor()
+    cur.execute("UPDATE posts SET title=%s, content=%s, thumbnail=%s WHERE id=%s",
+                (title, content, thumbnail or None, post_id))
+    con.commit()
+    con.close()
+    return jsonify({"ok": True})
+
 @app.route("/admin/post/<int:post_id>/delete", methods=["POST"])
 def admin_delete_post(post_id):
     if not session.get("admin"):
