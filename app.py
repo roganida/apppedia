@@ -633,8 +633,21 @@ def api_weekly():
     result = []
     for rank, (app_id, vote_count) in enumerate(rows, 1):
         if app_id.startswith("gp_"):
-            info = {"name": app_id, "icon": "", "developer": "", "store": "googleplay",
-                    "url": "", "category": ""}
+            gp_id = app_id[3:]
+            try:
+                from google_play_scraper import app as gp_app
+                d = gp_app(gp_id, lang="ko", country="kr")
+                info = {
+                    "name":      d.get("title", gp_id),
+                    "icon":      d.get("icon", ""),
+                    "developer": d.get("developer", ""),
+                    "category":  d.get("genre", ""),
+                    "store":     "googleplay",
+                    "url":       f"https://play.google.com/store/apps/details?id={gp_id}"
+                }
+            except:
+                info = {"name": gp_id, "icon": "", "developer": "", "store": "googleplay",
+                        "url": "", "category": ""}
         else:
             info = fetch_itunes_info(app_id) or {}
             info["store"] = "appstore"
