@@ -940,7 +940,7 @@ def admin_delete():
 
 @app.route("/sitemap.xml")
 def sitemap():
-    urls = ['  <url>\n    <loc>https://www.apppedia.co.kr/</loc>\n    <changefreq>hourly</changefreq>\n    <priority>1.0</priority>\n  </url>']
+    urls = ['  <url>\n    <loc>https://apppedia.co.kr/</loc>\n    <changefreq>hourly</changefreq>\n    <priority>1.0</priority>\n  </url>']
 
     # 에디터픽 앱 페이지
     try:
@@ -948,12 +948,12 @@ def sitemap():
         cur = con.cursor()
         cur.execute("SELECT DISTINCT app_id FROM curated")
         for (app_id,) in cur.fetchall():
-            urls.append(f'  <url>\n    <loc>https://www.apppedia.co.kr/app/{app_id}</loc>\n    <changefreq>daily</changefreq>\n    <priority>0.8</priority>\n  </url>')
+            urls.append(f'  <url>\n    <loc>https://apppedia.co.kr/app/{app_id}</loc>\n    <changefreq>daily</changefreq>\n    <priority>0.8</priority>\n  </url>')
 
         # 트렌드 글 페이지
         cur.execute("SELECT id FROM posts ORDER BY created_at DESC")
         for (post_id,) in cur.fetchall():
-            urls.append(f'  <url>\n    <loc>https://www.apppedia.co.kr/post/{post_id}</loc>\n    <changefreq>weekly</changefreq>\n    <priority>0.7</priority>\n  </url>')
+            urls.append(f'  <url>\n    <loc>https://apppedia.co.kr/post/{post_id}</loc>\n    <changefreq>weekly</changefreq>\n    <priority>0.7</priority>\n  </url>')
         con.close()
     except:
         pass
@@ -967,7 +967,7 @@ def sitemap():
 def robots():
     txt = """User-agent: *
 Allow: /
-Sitemap: https://www.apppedia.co.kr/sitemap.xml"""
+Sitemap: https://apppedia.co.kr/sitemap.xml"""
     return app.response_class(txt, mimetype="text/plain")
 
 if __name__ == "__main__":
