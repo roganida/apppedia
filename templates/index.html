@@ -436,42 +436,9 @@
           <span class="text-xs text-gray-500 font-medium">앱과사전 팀</span>
         </div>`;
 
-      const hero = posts[0];
-      const heroHtml = `
-        <a href="/post/${hero.id}" class="app-card block overflow-hidden mb-4 group">
-          ${hero.thumbnail
-            ? `<div class="relative overflow-hidden rounded-t-2xl">
-                <img src="${escHtml(hero.thumbnail)}" class="w-full h-52 object-cover group-hover:scale-105 transition-transform duration-500"/>
-                <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent"></div>
-                <div class="absolute bottom-4 left-4 right-4">
-                  ${isNew(hero.created_at) ? `<span class="inline-block bg-blue-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-md mb-2">NEW</span>` : ''}
-                  <div class="font-extrabold text-white text-base line-clamp-2 drop-shadow">${escHtml(hero.title)}</div>
-                </div>
-              </div>
-              <div class="px-5 py-3 flex items-center justify-between">
-                ${authorBadge}
-                <div class="flex items-center gap-3 text-xs text-gray-400">
-                  <span>${hero.created_at}</span>
-                  <span>· ${hero.read_min || 3}분 읽기</span>
-                </div>
-              </div>`
-            : `<div class="px-5 py-7 bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 rounded-t-2xl">
-                ${isNew(hero.created_at) ? `<span class="inline-block bg-blue-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-md mb-3">NEW</span>` : ''}
-                <div class="font-extrabold text-xl text-gray-900 mb-3 group-hover:text-blue-600 transition-colors line-clamp-3">${escHtml(hero.title)}</div>
-                ${hero.excerpt ? `<p class="text-sm text-gray-500 line-clamp-2 mb-3">${escHtml(hero.excerpt)}</p>` : ''}
-              </div>
-              <div class="px-5 py-3 flex items-center justify-between border-t border-gray-100">
-                ${authorBadge}
-                <div class="flex items-center gap-3 text-xs text-gray-400">
-                  <span>${hero.created_at}</span>
-                  <span>· ${hero.read_min || 3}분 읽기</span>
-                </div>
-              </div>`}
-        </a>`;
-
-      const restHtml = posts.slice(1).length ? `
+      const allPostsHtml = `
         <div class="space-y-3">
-          ${posts.slice(1).map(p => `
+          ${posts.map(p => `
             <a href="/post/${p.id}" class="app-card flex gap-4 p-4 block group">
               ${p.thumbnail
                 ? `<img src="${escHtml(p.thumbnail)}" class="w-24 h-24 rounded-2xl object-cover shrink-0 group-hover:opacity-90 transition-opacity"/>`
@@ -488,7 +455,7 @@
                 </div>
               </div>
             </a>`).join('')}
-        </div>` : '';
+        </div>`;
 
       el.innerHTML = `
         <div class="mb-4 px-1 flex items-center justify-between">
@@ -498,7 +465,7 @@
           </div>
           <span class="text-xs text-gray-400">${posts.length}개의 글</span>
         </div>
-        ${heroHtml}${restHtml}`;
+        ${allPostsHtml}`;
     }
 
     function populateCategories() {
