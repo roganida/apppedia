@@ -994,5 +994,10 @@ def ads_txt():
     txt = "google.com, pub-8090455218036534, DIRECT, f08c47fec0942fa0"
     return app.response_class(txt, mimetype="text/plain")
 
+@app.route("/ads.txt")
+def ads_txt():
+    txt = "google.com, pub-8090455218036534, DIRECT, f08c47fec0942fa0"
+    return app.response_class(txt, mimetype="text/plain")
+
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
