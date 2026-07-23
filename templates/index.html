@@ -365,13 +365,13 @@
         const latest = posts.slice(0, 5);
         const strip = document.getElementById('news-strip');
         strip.innerHTML = latest.map(p => `
-          <a href="/post/${p.id}" class="app-card flex items-center gap-3 px-4 py-3 block group hover:border-blue-200">
+          <a href="/post/${p.id}" class="app-card flex items-center gap-2.5 px-3 py-2 block group hover:border-blue-200">
             ${p.thumbnail
-              ? `<img src="${p.thumbnail}" class="w-12 h-12 rounded-xl object-cover shrink-0" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"/><div class="w-12 h-12 rounded-xl shrink-0 hero-accent hidden items-center justify-center text-white text-lg">📰</div>`
-              : `<div class="w-12 h-12 rounded-xl shrink-0 hero-accent flex items-center justify-center text-white text-lg">📰</div>`
+              ? `<img src="${p.thumbnail}" class="w-8 h-8 rounded-lg object-cover shrink-0" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"/><div class="w-8 h-8 rounded-lg shrink-0 hero-accent hidden items-center justify-center text-white text-xs">📰</div>`
+              : `<div class="w-8 h-8 rounded-lg shrink-0 hero-accent flex items-center justify-center text-white text-xs">📰</div>`
             }
-            <span class="text-sm font-medium text-gray-800 line-clamp-1 group-hover:text-blue-600 transition-colors flex-1">${p.title}</span>
-            <span class="text-xs text-gray-400 shrink-0">${p.created_at ? p.created_at.slice(5,10).replace('-','/') : ''}</span>
+            <span class="text-xs font-medium text-gray-800 line-clamp-1 group-hover:text-blue-600 transition-colors flex-1">${p.title}</span>
+            <span class="text-[11px] text-gray-400 shrink-0">${p.created_at ? p.created_at.slice(5,10).replace('-','/') : ''}</span>
           </a>`).join('');
       } catch(e) {}
     }
