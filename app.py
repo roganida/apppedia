@@ -785,7 +785,27 @@ def get_post(post_id):
 
 @app.route("/post/<int:post_id>")
 def post_detail(post_id):
-    return render_template("post_detail.html", post_id=post_id)
+    post = None
+    try:
+        import re
+        con = get_db()
+        cur = con.cursor()
+        cur.execute("SELECT id, title, content, thumbnail, created_at FROM posts WHERE id=%s", (post_id,))
+        r = cur.fetchone()
+        con.close()
+        if r:
+            raw = re.sub(r'<[^>]+>', '', r[2] or '')
+            desc = ' '.join(raw.split())[:155]
+            post = {
+                'id': r[0],
+                'title': r[1],
+                'description': desc,
+                'thumbnail': r[3] or '',
+                'created_at': str(r[4])[:10] if r[4] else ''
+            }
+    except:
+        pass
+    return render_template("post_detail.html", post_id=post_id, post=post)
 
 @app.route("/api/reviews/<app_id>")
 def get_reviews(app_id):
