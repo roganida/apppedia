@@ -4,7 +4,18 @@
   <meta charset="UTF-8" />
   <link rel="icon" type="image/svg+xml" href="/static/favicon.svg" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    {% if post %}
+  <title>{{ post.title }} — 앱과사전</title>
+  <meta name="description" content="{{ post.description }}">
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="{{ post.title }} — 앱과사전">
+  <meta property="og:description" content="{{ post.description }}">
+  <meta property="og:url" content="https://apppedia.co.kr/post/{{ post.id }}">
+  {% if post.thumbnail %}<meta property="og:image" content="{{ post.thumbnail }}">{% endif %}
+  <link rel="canonical" href="https://apppedia.co.kr/post/{{ post.id }}">
+  {% else %}
   <title id="page-title">앱 트렌드 — 앱과사전</title>
+  {% endif %}
   <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8090455218036534" crossorigin="anonymous"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
