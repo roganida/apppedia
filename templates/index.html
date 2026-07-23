@@ -234,6 +234,15 @@
 
   <main class="flex-1 min-w-0">
 
+    <!-- 최신 앱 뉴스 -->
+    <div class="mb-5">
+      <div class="flex items-center justify-between mb-3">
+        <span class="text-sm font-bold text-gray-800">📰 최신 앱 뉴스</span>
+        <button onclick="switchTab('trends')" class="text-xs text-blue-500 hover:text-blue-700 font-semibold">전체보기 →</button>
+      </div>
+      <div id="news-strip" class="space-y-2"></div>
+    </div>
+
     <!-- Tabs -->
     <div class="tab-wrap p-1.5 flex gap-1 mb-6 overflow-x-auto" style="scrollbar-width:none">
       <button onclick="switchTab('downloads')" id="tab-downloads"
@@ -348,6 +357,23 @@
   </div><!-- end 3단 레이아웃 -->
 
   <script>
+    // 최신 앱 뉴스 스트립 로드
+    async function loadNewsStrip() {
+      try {
+        const res = await fetch('/api/posts');
+        const posts = await res.json();
+        const latest = posts.slice(0, 5);
+        const strip = document.getElementById('news-strip');
+        strip.innerHTML = latest.map(p => `
+          <a href="/post/${p.id}" class="app-card flex items-center gap-3 px-4 py-3 block group hover:border-blue-200">
+            <span class="text-lg shrink-0">📱</span>
+            <span class="text-sm font-medium text-gray-800 line-clamp-1 group-hover:text-blue-600 transition-colors flex-1">${p.title}</span>
+            <span class="text-xs text-gray-400 shrink-0">${p.created_at ? p.created_at.slice(5,10).replace('-','/') : ''}</span>
+          </a>`).join('');
+      } catch(e) {}
+    }
+    loadNewsStrip();
+
     const now = new Date();
     document.getElementById('today-date').textContent =
       `${now.getFullYear()}.${String(now.getMonth()+1).padStart(2,'0')}.${String(now.getDate()).padStart(2,'0')}`;
