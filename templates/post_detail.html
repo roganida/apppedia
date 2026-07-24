@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <link rel="icon" type="image/svg+xml" href="/static/favicon.svg" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    {% if post %}
+  {% if post %}
   <title>{{ post.title }} — 앱과사전</title>
   <meta name="description" content="{{ post.description }}">
   <meta property="og:type" content="article">
@@ -80,7 +80,8 @@
         const res = await fetch(`/api/posts/${postId}`);
         if (!res.ok) throw new Error();
         const d = await res.json();
-        document.getElementById('page-title').textContent = `${d.title} — 앱과사전`;
+        const titleEl = document.getElementById('page-title');
+        if (titleEl) titleEl.textContent = `${d.title} — 앱과사전`;
         document.getElementById('post-title').textContent = d.title;
         document.getElementById('post-date').textContent = d.created_at;
         document.getElementById('post-content').innerHTML = d.content;
