@@ -234,6 +234,18 @@
 
   <main class="flex-1 min-w-0">
 
+    <!-- 사이트 소개 -->
+    <div class="mb-5 app-card p-5">
+      <h2 class="text-sm font-extrabold text-gray-900 mb-1.5">📱 앱과사전이란?</h2>
+      <p class="text-xs text-gray-500 leading-relaxed">앱과사전은 대한민국 App Store와 Google Play의 실시간 앱 순위를 한눈에 볼 수 있는 서비스예요. 다운로드 순위·매출 순위·신규 앱·게임 차트를 매 시간 자동 업데이트하며, 에디터가 직접 엄선한 추천 앱과 사용자 투표 순위도 함께 제공합니다. 앱을 고를 때 어떤 앱이 지금 가장 인기 있는지 확인하고 싶다면 앱과사전을 활용해 보세요.</p>
+      <div class="flex gap-3 mt-3 flex-wrap">
+        <span class="text-[11px] bg-blue-50 text-blue-600 px-2.5 py-1 rounded-full font-semibold">📥 실시간 다운로드 순위</span>
+        <span class="text-[11px] bg-green-50 text-green-600 px-2.5 py-1 rounded-full font-semibold">🏆 매출 베스트셀러</span>
+        <span class="text-[11px] bg-purple-50 text-purple-600 px-2.5 py-1 rounded-full font-semibold">⭐ 에디터 픽</span>
+        <span class="text-[11px] bg-orange-50 text-orange-600 px-2.5 py-1 rounded-full font-semibold">🆕 신규 앱</span>
+      </div>
+    </div>
+
     <!-- 최신 앱 뉴스 -->
     <div class="mb-5">
       <div class="flex items-center justify-between mb-3">
@@ -338,8 +350,31 @@
     <!-- List -->
     <div id="app-list" class="space-y-2"></div>
 
+    <!-- 자주 묻는 질문 -->
+    <div class="mt-10 mb-6 app-card p-5">
+      <h2 class="text-sm font-extrabold text-gray-900 mb-4">❓ 자주 묻는 질문</h2>
+      <div class="space-y-4">
+        <div>
+          <p class="text-xs font-bold text-gray-800 mb-1">앱 순위는 얼마나 자주 업데이트되나요?</p>
+          <p class="text-xs text-gray-500 leading-relaxed">App Store 공식 RSS와 Google Play 데이터를 기반으로 매 시간 자동 갱신됩니다. 페이지 우측 상단의 '실시간 업데이트' 표시를 통해 확인할 수 있어요.</p>
+        </div>
+        <div>
+          <p class="text-xs font-bold text-gray-800 mb-1">App Store와 Google Play 순위를 동시에 볼 수 있나요?</p>
+          <p class="text-xs text-gray-500 leading-relaxed">네, 다운로드 탭에서 App Store와 Google Play 순위를 나란히 비교할 수 있어요. 스토어 필터로 원하는 스토어만 골라볼 수도 있습니다.</p>
+        </div>
+        <div>
+          <p class="text-xs font-bold text-gray-800 mb-1">에디터 픽은 어떤 기준으로 선정되나요?</p>
+          <p class="text-xs text-gray-500 leading-relaxed">앱과사전 에디터가 매주 실제 차트 데이터와 사용자 반응을 분석해 직접 선정합니다. 다운로드 수, 평점, 사용자 리뷰 등을 종합적으로 고려해요.</p>
+        </div>
+        <div>
+          <p class="text-xs font-bold text-gray-800 mb-1">앱 뉴스는 어디서 볼 수 있나요?</p>
+          <p class="text-xs text-gray-500 leading-relaxed">상단의 '앱 뉴스' 탭 또는 메인 화면 상단의 '최신 앱 뉴스' 섹션에서 확인하세요. 앱 비교·추천 가이드를 정기적으로 업데이트합니다.</p>
+        </div>
+      </div>
+    </div>
+
     <!-- Footer -->
-    <div class="text-center mt-10 space-y-2">
+    <div class="text-center mt-6 space-y-2">
       <p class="text-xs text-gray-400">App Store 공식 RSS · Google Play 데이터 기반 · 매 시간 자동 갱신</p>
       <p class="text-xs text-gray-300">
         © 2026 앱과사전 ·
