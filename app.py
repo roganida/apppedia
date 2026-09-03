@@ -28,6 +28,13 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "apppedia-secret-2026")
 CORS(app)
 
+@app.before_request
+def redirect_to_main_domain():
+    host = request.host.split(':')[0]
+    if 'onrender.com' in host:
+        url = request.url.replace(request.host_url, 'https://www.apppedia.co.kr/')
+        return redirect(url, code=301)
+
 def get_db():
     url = DATABASE_URL
     if url and "sslmode" not in url:
