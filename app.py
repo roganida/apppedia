@@ -37,7 +37,7 @@ def redirect_to_main_domain():
 
 def get_db():
     url = DATABASE_URL
-    if url and "sslmode" not in url:
+    if url and "sslmode" not in url and "localhost" not in url and "127.0.0.1" not in url:
         url += "?sslmode=require"
     return psycopg2.connect(url)
 
@@ -1001,10 +1001,13 @@ def ads_txt():
     txt = "google.com, pub-8090455218036534, DIRECT, f08c47fec0942fa0"
     return app.response_class(txt, mimetype="text/plain")
 
-@app.route("/ads.txt")
-def ads_txt():
-    txt = "google.com, pub-8090455218036534, DIRECT, f08c47fec0942fa0"
-    return app.response_class(txt, mimetype="text/plain")
+@app.route("/terms")
+def terms():
+    return render_template("terms.html")
+
+@app.route("/about")
+def about():
+    return render_template("about.html")
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
