@@ -985,6 +985,14 @@ def sitemap():
     except:
         pass
 
+    # 고정 페이지 추가
+    for path, freq, priority in [
+        ("/about",   "monthly", "0.6"),
+        ("/privacy", "monthly", "0.5"),
+        ("/terms",   "monthly", "0.5"),
+    ]:
+        urls.append(f'  <url>\n    <loc>https://www.apppedia.co.kr{path}</loc>\n    <changefreq>{freq}</changefreq>\n    <priority>{priority}</priority>\n  </url>')
+
     xml = '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
     xml += '\n'.join(urls)
     xml += '\n</urlset>'
