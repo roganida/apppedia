@@ -5,10 +5,15 @@ import psycopg2
 import psycopg2.extras
 import os
 import time
+import hmac
+import hashlib
+import threading
+import subprocess
 from datetime import datetime
 
-ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "apppedia2026")
-DATABASE_URL   = os.environ.get("DATABASE_URL")
+ADMIN_PASSWORD   = os.environ.get("ADMIN_PASSWORD", "apppedia2026")
+DATABASE_URL     = os.environ.get("DATABASE_URL")
+WEBHOOK_SECRET   = os.environ.get("WEBHOOK_SECRET", "apppedia-deploy-2026")
 
 _cache = {}
 _CACHE_TTL = 3600  # 1시간
@@ -1004,6 +1009,32 @@ def robots():
 Allow: /
 Sitemap: https://www.apppedia.co.kr/sitemap.xml"""
     return app.response_class(txt, mimetype="text/plain")
+@app.route("/webhook", methods=["POST"])
+def webhook():
+    # GitHub 서명 검증
+    sig = request.headers.get("X-Hub-Signature-256", "")
+    body = request.get_data()
+    expected = "sha256=" + hmac.new(
+        WEBHOOK_SECRET.encode("utf-8"), msg=body, digestmod=hashlib.sha256
+    ).hexdigest()
+    if not hmac.compare_digest(sig, expected):
+        return jsonify({"error": "invalid signature"}), 403
+
+    def deploy():
+        time.sleep(2)
+        subprocess.run(["git", "-C", "/var/www/apppedia", "pull", "origin", "main"])
+        time.sleep(1)
+        subprocess.run(["pkill", "-f", "gunicorn"])
+        time.sleep(2)
+        subprocess.Popen([
+            "gunicorn", "--workers", "2",
+            "--bind", "127.0.0.1:8000", "app:app", "--daemon"
+        ], cwd="/var/www/apppedia")
+
+    t = threading.Thread(target=deploy, daemon=True)
+    t.start()
+    return jsonify({"ok": True, "message": "배포 시작!"})
+
 @app.route("/ads.txt")
 def ads_txt():
     txt = "google.com, pub-8090455218036534, DIRECT, f08c47fec0942fa0"
