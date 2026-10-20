@@ -14,7 +14,7 @@ from datetime import datetime
 ADMIN_PASSWORD      = os.environ.get("ADMIN_PASSWORD", "apppedia2026")
 DATABASE_URL        = os.environ.get("DATABASE_URL")
 WEBHOOK_SECRET      = os.environ.get("WEBHOOK_SECRET", "apppedia-deploy-2026")
-UNSPLASH_ACCESS_KEY = os.environ.get("UNSPLASH_ACCESS_KEY", "w8WRD0ZSlktggooQEz2SlbNgkQzxfV_K0GokPyntZbk")
+UNSPLASH_ACCESS_KEY = os.environ.get("UNSPLASH_ACCESS_KEY", "w8WRD0ZSlktggooQEz2SlbNgkQzxfV_KOGokPyntZbk")
 
 # 한국어 제목에서 Unsplash 검색 키워드 추출
 _TITLE_KEYWORD_MAP = [
