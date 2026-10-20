@@ -11,9 +11,56 @@ import threading
 import subprocess
 from datetime import datetime
 
-ADMIN_PASSWORD   = os.environ.get("ADMIN_PASSWORD", "apppedia2026")
-DATABASE_URL     = os.environ.get("DATABASE_URL")
-WEBHOOK_SECRET   = os.environ.get("WEBHOOK_SECRET", "apppedia-deploy-2026")
+ADMIN_PASSWORD      = os.environ.get("ADMIN_PASSWORD", "apppedia2026")
+DATABASE_URL        = os.environ.get("DATABASE_URL")
+WEBHOOK_SECRET      = os.environ.get("WEBHOOK_SECRET", "apppedia-deploy-2026")
+UNSPLASH_ACCESS_KEY = os.environ.get("UNSPLASH_ACCESS_KEY", "w8WRD0ZSlktggooQEz2SlbNgkQzxfV_K0GokPyntZbk")
+
+# 한국어 제목에서 Unsplash 검색 키워드 추출
+_TITLE_KEYWORD_MAP = [
+    (["드라마","숏드라마","영화","OTT","넷플릭스","왓챠","웨이브","티빙","시리즈"], "streaming drama video"),
+    (["배달","음식","맛집","식당","푸드","배민","쿠팡이츠","요기요"], "food delivery restaurant"),
+    (["금융","재테크","주식","투자","은행","토스","카카오뱅크","케이뱅크"], "finance banking mobile"),
+    (["지도","네비","길찾기","교통","카카오맵","네이버지도","티맵"], "navigation map city"),
+    (["쇼핑","이커머스","쿠팡","네이버쇼핑","11번가","무신사"], "shopping ecommerce"),
+    (["여행","숙소","항공","호텔","야놀자","여기어때"], "travel hotel vacation"),
+    (["육아","임신","아기","어린이","키즈","아이"], "parenting baby child"),
+    (["운동","헬스","다이어트","러닝","피트니스","홈트"], "fitness workout exercise"),
+    (["독서","전자책","책","교육","학습","공부"], "reading books education"),
+    (["음악","스트리밍","멜론","스포티파이","유튜브뮤직"], "music streaming headphones"),
+    (["사진","카메라","영상편집","필터","스노우","VSCO"], "photography camera smartphone"),
+    (["메신저","채팅","소통","카카오톡","텔레그램"], "messaging chat communication"),
+    (["게임","RPG","퍼즐","캐주얼","배틀"], "mobile game gaming"),
+    (["부동산","아파트","집","청약","직방","호갱노노"], "real estate apartment"),
+    (["날씨","기상","미세먼지"], "weather sky clouds"),
+    (["뉴스","미디어","언론","신문"], "news media newspaper"),
+    (["비교","추천","순위","랭킹","앱"], "smartphone apps technology"),
+]
+
+def title_to_unsplash_query(title: str) -> str:
+    for keywords, query in _TITLE_KEYWORD_MAP:
+        for kw in keywords:
+            if kw in title:
+                return query
+    return "smartphone app technology"
+
+def fetch_unsplash_thumbnail(title: str) -> str:
+    """제목 기반으로 Unsplash 랜덤 이미지 URL 반환. 실패 시 빈 문자열."""
+    try:
+        query = title_to_unsplash_query(title)
+        r = requests.get(
+            "https://api.unsplash.com/photos/random",
+            params={"query": query, "orientation": "landscape", "content_filter": "high"},
+            headers={"Authorization": f"Client-ID {UNSPLASH_ACCESS_KEY}"},
+            timeout=8,
+        )
+        if r.status_code == 200:
+            data = r.json()
+            # regular 사이즈 (1080px) 사용
+            return data.get("urls", {}).get("regular", "")
+    except Exception as ex:
+        print(f"Unsplash error: {ex}")
+    return ""
 
 _cache = {}
 _CACHE_TTL = 3600  # 1시간
@@ -879,13 +926,18 @@ def admin_post():
     thumbnail = (data.get("thumbnail") or "").strip()
     if not title or not content:
         return jsonify({"error": "제목과 내용을 입력해주세요"}), 400
+    # 썸네일 없으면 Unsplash에서 자동 가져오기
+    if not thumbnail:
+        thumbnail = fetch_unsplash_thumbnail(title)
     con = get_db()
     cur = con.cursor()
     cur.execute("INSERT INTO posts (title, content, thumbnail, created_at) VALUES (%s,%s,%s,%s)",
                 (title, content, thumbnail, datetime.now().isoformat()))
     con.commit()
+    cur.execute("SELECT lastval()")
+    new_id = cur.fetchone()[0]
     con.close()
-    return jsonify({"ok": True})
+    return jsonify({"ok": True, "id": new_id, "thumbnail": thumbnail})
 
 @app.route("/admin/post/<int:post_id>/edit", methods=["POST"])
 def admin_edit_post(post_id):
@@ -897,13 +949,16 @@ def admin_edit_post(post_id):
     thumbnail = data.get("thumbnail", "").strip()
     if not title or not content:
         return jsonify({"error": "missing fields"}), 400
+    # 썸네일이 명시적으로 전달되지 않았으면 Unsplash 자동 가져오기
+    if not thumbnail:
+        thumbnail = fetch_unsplash_thumbnail(title)
     con = get_db()
     cur = con.cursor()
     cur.execute("UPDATE posts SET title=%s, content=%s, thumbnail=%s WHERE id=%s",
                 (title, content, thumbnail or None, post_id))
     con.commit()
     con.close()
-    return jsonify({"ok": True})
+    return jsonify({"ok": True, "thumbnail": thumbnail})
 
 @app.route("/admin/post/<int:post_id>/delete", methods=["POST"])
 def admin_delete_post(post_id):
@@ -969,6 +1024,29 @@ def admin_delete():
     con.commit()
     con.close()
     return jsonify({"ok": True})
+
+@app.route("/admin/posts/thumbnails", methods=["POST"])
+def batch_thumbnails():
+    """썸네일 없는 글들에 Unsplash 이미지를 일괄 적용"""
+    if not session.get("admin"):
+        return jsonify({"error": "unauthorized"}), 401
+    con = get_db()
+    cur = con.cursor()
+    cur.execute("SELECT id, title FROM posts WHERE thumbnail IS NULL OR thumbnail = ''")
+    rows = cur.fetchall()
+    updated = 0
+    skipped = 0
+    for post_id, title in rows:
+        url = fetch_unsplash_thumbnail(title)
+        if url:
+            cur.execute("UPDATE posts SET thumbnail=%s WHERE id=%s", (url, post_id))
+            updated += 1
+        else:
+            skipped += 1
+        time.sleep(0.3)  # Unsplash rate limit 방지
+    con.commit()
+    con.close()
+    return jsonify({"ok": True, "updated": updated, "skipped": skipped})
 
 @app.route("/sitemap.xml")
 def sitemap():
