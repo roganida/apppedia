@@ -442,24 +442,43 @@
         renderPostCards();
       } catch(e) {}
     }
+    function getPostTheme(title) {
+      const t = title || '';
+      if (/드라마|OTT|티빙|넷플|왓챠|웹툰|숏폼/.test(t))   return { bg: 'linear-gradient(135deg,#f093fb,#f5576c)', emoji: '🎬' };
+      if (/배달|음식|맛집|식당|쿠팡이츠|배민/.test(t))       return { bg: 'linear-gradient(135deg,#f7971e,#ffd200)', emoji: '🍔' };
+      if (/금융|페이|토스|은행|신용|세금|환급/.test(t))       return { bg: 'linear-gradient(135deg,#43e97b,#38f9d7)', emoji: '💰' };
+      if (/여행|지도|숙소|항공|교통|택시|카카오T/.test(t))    return { bg: 'linear-gradient(135deg,#4facfe,#00f2fe)', emoji: '✈️' };
+      if (/육아|임신|출산|아기|베이비|마미/.test(t))          return { bg: 'linear-gradient(135deg,#ff9a9e,#fecfef)', emoji: '👶' };
+      if (/AI|챗GPT|클로드|제미나이|인공지능/.test(t))        return { bg: 'linear-gradient(135deg,#a18cd1,#fbc2eb)', emoji: '🤖' };
+      if (/쇼핑|무신사|지그재그|에이블리/.test(t))            return { bg: 'linear-gradient(135deg,#fd7043,#ff8a65)', emoji: '🛍️' };
+      if (/영어|학습|공부|토익|듀오링고/.test(t))             return { bg: 'linear-gradient(135deg,#30cfd0,#330867)', emoji: '📚' };
+      if (/헬스|운동|건강|다이어트/.test(t))                  return { bg: 'linear-gradient(135deg,#f77062,#fe5196)', emoji: '💪' };
+      if (/부동산|직방|다방|청약/.test(t))                    return { bg: 'linear-gradient(135deg,#5ee7df,#b490ca)', emoji: '🏠' };
+      return { bg: 'linear-gradient(135deg,#00b4d8,#0077b6)', emoji: '📱' };
+    }
+
     function renderPostCards() {
       const container = document.getElementById('post-cards');
       const moreBtn = document.getElementById('post-cards-more');
       const toShow = allPosts.slice(0, shownPostCount);
-      container.innerHTML = toShow.map(p => `
-        <a href="/post/${p.id}" class="app-card block p-4 group hover:border-blue-300 hover:shadow-md transition-all">
-          <div class="flex items-start gap-3">
-            <div class="w-10 h-10 rounded-xl shrink-0 hero-accent flex items-center justify-center text-white text-lg">📝</div>
-            <div class="flex-1 min-w-0">
-              <p class="text-sm font-bold text-gray-900 group-hover:text-blue-600 transition-colors line-clamp-2 leading-snug">${p.title}</p>
-              <div class="flex items-center gap-2 mt-1.5">
-                <span class="text-[11px] text-gray-400">${p.created_at ? p.created_at.slice(5,10).replace('-','/') : ''}</span>
-                <span class="text-[11px] text-gray-300">·</span>
-                <span class="text-[11px] text-gray-400">읽는 시간 ${p.read_min}분</span>
-              </div>
+      container.innerHTML = toShow.map(p => {
+        const theme = getPostTheme(p.title);
+        const thumb = p.thumbnail
+          ? `<img src="${p.thumbnail}" class="w-full h-28 object-cover" onerror="this.parentElement.style.background='${theme.bg}';this.outerHTML='<div style=\'width:100%;height:7rem;display:flex;align-items:center;justify-content:center;font-size:2.5rem\'>${theme.emoji}</div>'">`
+          : `<div style="width:100%;height:7rem;background:${theme.bg};display:flex;align-items:center;justify-content:center;font-size:2.5rem">${theme.emoji}</div>`;
+        return `
+        <a href="/post/${p.id}" class="app-card block overflow-hidden group hover:border-blue-300 hover:shadow-md transition-all">
+          <div class="rounded-t-xl overflow-hidden">${thumb}</div>
+          <div class="p-3">
+            <p class="text-sm font-bold text-gray-900 group-hover:text-blue-600 transition-colors line-clamp-2 leading-snug">${p.title}</p>
+            <div class="flex items-center gap-2 mt-1.5">
+              <span class="text-[11px] text-gray-400">${p.created_at ? p.created_at.slice(5,10).replace('-','/') : ''}</span>
+              <span class="text-[11px] text-gray-300">·</span>
+              <span class="text-[11px] text-gray-400">읽는 시간 ${p.read_min}분</span>
             </div>
           </div>
-        </a>`).join('');
+        </a>`;
+      }).join('');
       if (allPosts.length > shownPostCount) {
         moreBtn.classList.remove('hidden');
       } else {
